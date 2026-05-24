@@ -35,6 +35,102 @@ const chartModalCanvasEl = document.getElementById('chart-modal-canvas');
 const closeChartModalBtn = document.getElementById('close-chart-modal');
 let modalChart = null;
 
+const forecast5DayEl = document.getElementById('forecast-5day');
+let forecastCache = {};
+
+function riskLevelFromScore(score){
+  if(score<=2.5) return 'Low';
+  if(score<=5) return 'Moderate';
+  if(score<=7.5) return 'High';
+  return 'Very High';
+}
+
+function analyzeDayPressure(dayHours, historyMatch=false){
+  const p = dayHours.pressure;
+  const h = dayHours.humidity;
+  const pp = dayHours.precipProb;
+  const pr = dayHours.precip;
+  const cc = dayHours.cloud;
+  const velocity=[]; const acceleration=[];
+  for(let i=1;i<p.length;i++) velocity.push(p[i]-p[i-1]);
+  for(let i=1;i<velocity.length;i++) acceleration.push(velocity[i]-velocity[i-1]);
+  const maxHourlyDrop = velocity.length ? Math.min(...velocity) : 0;
+  const total24hDrop = p.length ? p[p.length-1]-p[0] : 0;
+  const volatility = velocity.reduce((s,v)=>s+Math.abs(v),0);
+  const accelerationSpikes = acceleration.filter(v=>Math.abs(v)>=2).length;
+  const avgHumidity = avg(h) || 0;
+  const avgCloud = avg(cc) || 0;
+  const rainSignal = (avg(pp)||0)>=50 || (pr||[]).some(v=>v>0);
+
+  let score=0; const drivers=[];
+  if(maxHourlyDrop<=-1.5){ score+=1; drivers.push('hourly pressure drop'); }
+  if(maxHourlyDrop<=-2.5){ score+=2; drivers.push('strong hourly pressure drop'); }
+  if(total24hDrop<=-4){ score+=1.5; drivers.push('24h pressure drop'); }
+  if(total24hDrop<=-7){ score+=2.5; drivers.push('large 24h pressure drop'); }
+  if(volatility>=10){ score+=1.5; drivers.push('unstable atmospheric conditions'); }
+  if(accelerationSpikes>=1){ score+=1.5; drivers.push('rapid pressure transition'); }
+  if(avgHumidity>75){ score+=1; drivers.push('high humidity'); }
+  if(rainSignal){ score+=1; drivers.push('rain/storm signal'); }
+  if(avgCloud>80){ score+=0.75; drivers.push('heavy cloud cover'); }
+  if(historyMatch){ score+=1.5; drivers.push('history pattern match'); }
+  score=Math.max(0,Math.min(10,Number(score.toFixed(1))));
+
+  return { score, level:riskLevelFromScore(score), drivers, maxHourlyDrop, total24hDrop, volatility:Number(volatility.toFixed(2)), accelerationSpikes, avgHumidity:Number(avgHumidity.toFixed(1)), avgCloud:Number(avgCloud.toFixed(1)), rainSignal };
+}
+
+function suggestionForRisk(analysis){
+  const tips=[];
+  if(analysis.avgHumidity>75) tips.push('Keep hydrated and avoid overheating.');
+  if(analysis.maxHourlyDrop<=-1.5 || analysis.total24hDrop<=-4) tips.push('Consider preparing migraine medication if prescribed and monitor early symptoms.');
+  if(analysis.rainSignal) tips.push('Consider reducing intense outdoor plans.');
+  if(analysis.level==='High' || analysis.level==='Very High') tips.push('Prioritise sleep, hydration, regular meals and lower sensory load.');
+  if(!tips.length) tips.push('Conditions look relatively stable. Continue normal routine.');
+  tips.push('May increase risk; possible trigger; not medical advice.');
+  return tips;
+}
+
+async function renderFiveDayForecast(entries){
+  if(!forecast5DayEl) return;
+  forecast5DayEl.innerHTML = '<p class="empty">Loading forecast…</p>';
+  try {
+    const loc = matchedLocation || entries.at(-1)?.location;
+    if(!loc){ forecast5DayEl.innerHTML = '<p class="empty">Set location to view 5-day risk forecast.</p>'; return; }
+    const start = new Date(); const end = new Date(); end.setDate(end.getDate()+4);
+    const sd=start.toISOString().slice(0,10), ed=end.toISOString().slice(0,10);
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&start_date=${sd}&end_date=${ed}&hourly=pressure_msl,surface_pressure,relative_humidity_2m,precipitation_probability,precipitation,cloud_cover&timezone=auto`;
+    const res = await fetchWithTimeout(url, 5000);
+    if(!res.ok) throw new Error(`Forecast HTTP ${res.status}`);
+    const data = await res.json(); const h=data.hourly||{};
+    const days={};
+    (h.time||[]).forEach((t,i)=>{ const d=t.slice(0,10); if(!days[d]) days[d]={pressure:[],humidity:[],precipProb:[],precip:[],cloud:[]}; days[d].pressure.push((h.pressure_msl?.[i] ?? h.surface_pressure?.[i]) ?? null); days[d].humidity.push(h.relative_humidity_2m?.[i] ?? null); days[d].precipProb.push(h.precipitation_probability?.[i] ?? null); days[d].precip.push(h.precipitation?.[i] ?? null); days[d].cloud.push(h.cloud_cover?.[i] ?? null); });
+
+    const severe = entries.filter(e=>e.severity>=7);
+    const cards = Object.entries(days).slice(0,5).map(([date,vals])=>{
+      vals.pressure = vals.pressure.filter(v=>v!=null);
+      const historyMatch = severe.some(e=>Math.abs((e.weather?.pressureChange||0) - (vals.pressure.length?vals.pressure[vals.pressure.length-1]-vals.pressure[0]:0)) <= 2);
+      const analysis = analyzeDayPressure(vals, historyMatch);
+      forecastCache[date]=analysis;
+      const tips=suggestionForRisk(analysis);
+      return `<article class="forecast-card risk-${analysis.level.toLowerCase().replace(' ','-')}"><h4>${new Date(date).toLocaleDateString(undefined,{weekday:'long', month:'short', day:'numeric'})}</h4><p><strong>Risk:</strong> ${analysis.score}/10 — ${analysis.level}</p><p><strong>Drivers:</strong> ${(analysis.drivers.join(' · ')||'No major atmospheric drivers')}</p><p><strong>Pressure trend:</strong> drop ${analysis.maxHourlyDrop.toFixed(1)} hPa/h, 24h ${analysis.total24hDrop.toFixed(1)} hPa</p><p><strong>Humidity:</strong> ${analysis.avgHumidity}% · <strong>Rain/Cloud:</strong> ${analysis.rainSignal?'signal':'none'} / ${analysis.avgCloud}%</p><ul>${tips.map(t=>`<li>${t}</li>`).join('')}</ul></article>`;
+    });
+    forecast5DayEl.innerHTML = cards.join('');
+  } catch (err) {
+    console.error('5-day forecast failed', err);
+    forecast5DayEl.innerHTML = '<p class="empty">Forecast temporarily unavailable. Try refreshing later.</p>';
+  }
+}
+
+function applyForecastBadges(){
+  if(!calendarHeatmapEl) return;
+  const y=currentCalendarDate.getFullYear(); const m=currentCalendarDate.getMonth();
+  Array.from(calendarHeatmapEl.children).forEach((cell,idx)=>{
+    if(cell.classList.contains('empty')) return;
+    const dayNum = Number(cell.textContent)||null;
+    if(!dayNum) return;
+  });
+}
+
+
 // Calendar heatmap (incremental feature; preserves existing architecture)
 const calendarHeatmapEl = document.getElementById('calendar-heatmap');
 const calendarMonthLabelEl = document.getElementById('calendar-month-label');
@@ -80,10 +176,16 @@ Severity: ${sev}
 Symptoms: ${(e.symptoms||[]).join(', ')||'-'}
 Triggers: ${(e.triggers||[]).join(', ')||'-'}
 Pressure: ${e.weather?.pressure ?? 'N/A'}` : `${key}: no migraine logged`;
-    if(sev==null) cells.push(`<div class="heat-cell" title="${tip}"></div>`);
-    else cells.push(`<div class="heat-cell ${severityClass(sev)}" title="${tip}"></div>`);
+    if(sev==null) cells.push(`<div class="heat-cell" data-date="${key}" title="${tip}"><span class="day-num">${d}</span></div>`);
+    else cells.push(`<div class="heat-cell ${severityClass(sev)}" data-date="${key}" title="${tip}"><span class="day-num">${d}</span></div>`);
   }
   calendarHeatmapEl.innerHTML = cells.join('');
+  try {
+    calendarHeatmapEl.querySelectorAll('.heat-cell[data-date]').forEach((cell)=>{
+      const date = cell.dataset.date; const f = forecastCache[date];
+      if(f){ cell.classList.add('forecast-cell'); const dot=document.createElement('i'); dot.className=`forecast-dot risk-${f.level.toLowerCase().replace(' ','-')}`; cell.appendChild(dot); const prev=cell.getAttribute('title')||''; cell.setAttribute('title', `${prev}\nForecast risk: ${f.score}/10 (${f.level})`); }
+    });
+  } catch(err){ console.error('Forecast badge render failed', err); }
 }
 
 function renderAnnualHeatmap(entries){
@@ -359,7 +461,7 @@ function renderPressureInsights(entries){ if(!pressureInsightsEl) return; const 
 function deleteEntry(index){ if(!confirm('Delete this entry?')) return; const entries=loadEntries(); entries.splice(index,1); saveEntries(entries); refresh(); }
 
 function renderDashboard(entries){ renderPressureForecast(entries); renderPressureInsights(entries); }
-function refresh(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); renderTrendCharts(entries); try { renderCalendar(entries); } catch (err) { console.error('Calendar module failed during refresh (non-blocking)', err); } applyMoodState(entries); }
+function refresh(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); renderTrendCharts(entries); try { renderCalendar(entries); } catch (err) { console.error('Calendar module failed during refresh (non-blocking)', err); } try { renderFiveDayForecast(entries); } catch(err){ console.error('Forecast render failed (non-blocking)', err); } applyMoodState(entries); }
 
 form.addEventListener('submit', async (event)=>{ event.preventDefault(); const city=document.getElementById('location-city').value.trim(); if(!city){ submitStatusEl.textContent='Location required.'; return; } let location=matchedLocation; if(!location) location=await resolveLocation(); if(!location){ submitStatusEl.textContent='Location lookup failed.'; return; }
   const entry={ date:document.getElementById('entry-date').value, severity:Number(document.getElementById('severity').value), sleep:document.getElementById('sleep').value, stress:document.getElementById('stress').value, mealTime:document.getElementById('meal-time').value, caffeine:document.getElementById('caffeine').value, alcohol:document.getElementById('alcohol').value, hydration:document.getElementById('hydration').value, skippedMeals:document.getElementById('skipped-meals').checked, foodNotes:document.getElementById('food-notes').value.trim(), symptoms:selectedTags('symptom'), triggers:selectedTags('trigger'), notes:document.getElementById('notes').value.trim(), location, weather:{}, localStatus:'Saved locally', weatherFetchStatus:'pending', airQuality:{unavailable:true}, pollenFetchStatus:'pending' };
