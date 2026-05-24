@@ -104,13 +104,17 @@ function renderAnnualHeatmap(entries){
 }
 
 function renderCalendar(entries){
-  renderCalendar(entries);
-  renderAnnualHeatmap(entries);
-  const monthMode = calendarViewMode==='month';
-  calendarHeatmapEl.classList.toggle('hidden', !monthMode);
-  calendarYearViewEl?.classList.toggle('hidden', monthMode);
-  calendarViewMonthBtn?.classList.toggle('active', monthMode);
-  calendarViewYearBtn?.classList.toggle('active', !monthMode);
+  try {
+    renderCalendarHeatmap(entries);
+    renderAnnualHeatmap(entries);
+    const monthMode = calendarViewMode==='month';
+    calendarHeatmapEl?.classList.toggle('hidden', !monthMode);
+    calendarYearViewEl?.classList.toggle('hidden', monthMode);
+    calendarViewMonthBtn?.classList.toggle('active', monthMode);
+    calendarViewYearBtn?.classList.toggle('active', !monthMode);
+  } catch (err) {
+    console.error('Calendar render failed (non-blocking)', err);
+  }
 }
 
 
@@ -328,15 +332,15 @@ function renderPressureInsights(entries){ if(!pressureInsightsEl) return; const 
 function deleteEntry(index){ if(!confirm('Delete this entry?')) return; const entries=loadEntries(); entries.splice(index,1); saveEntries(entries); refresh(); }
 
 function renderDashboard(entries){ renderPressureForecast(entries); renderPressureInsights(entries); }
-function refresh(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); renderTrendCharts(entries); renderCalendar(entries); }
+function refresh(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); renderTrendCharts(entries); try { renderCalendar(entries); } catch (err) { console.error('Calendar module failed during refresh (non-blocking)', err); } }
 
 form.addEventListener('submit', async (event)=>{ event.preventDefault(); const city=document.getElementById('location-city').value.trim(); if(!city){ submitStatusEl.textContent='Location required.'; return; } let location=matchedLocation; if(!location) location=await resolveLocation(); if(!location){ submitStatusEl.textContent='Location lookup failed.'; return; }
   const entry={ date:document.getElementById('entry-date').value, severity:Number(document.getElementById('severity').value), sleep:document.getElementById('sleep').value, stress:document.getElementById('stress').value, mealTime:document.getElementById('meal-time').value, caffeine:document.getElementById('caffeine').value, alcohol:document.getElementById('alcohol').value, hydration:document.getElementById('hydration').value, skippedMeals:document.getElementById('skipped-meals').checked, foodNotes:document.getElementById('food-notes').value.trim(), symptoms:selectedTags('symptom'), triggers:selectedTags('trigger'), notes:document.getElementById('notes').value.trim(), location, weather:{}, localStatus:'Saved locally', weatherFetchStatus:'pending', airQuality:{unavailable:true}, pollenFetchStatus:'pending' };
   const entries=loadEntries(); entries.push(entry); const idx=entries.length-1; saveEntries(entries); submitStatusEl.textContent='Saved locally. Weather pending.'; if(savedConfirmationEl) savedConfirmationEl.textContent='✅ Saved locally'; form.reset(); document.getElementById('entry-date').valueAsDate=new Date(); document.querySelectorAll('.tag.active').forEach(el=>el.classList.remove('active')); refresh(); refreshEntryWeather(idx);
 });
 
-document.getElementById('resolve-location').addEventListener('click', resolveLocation);
-document.getElementById('add-custom-trigger').addEventListener('click', ()=>{ const raw=document.getElementById('custom-trigger-input').value.trim().toLowerCase(); if(!raw) return; const c=[...defaultTriggers,...loadCustomTriggers()].map(t=>t.toLowerCase()); if(c.includes(raw)) return; const n=[...loadCustomTriggers(),raw]; saveCustomTriggers(n); createTagButtons(triggerTagsEl,[...defaultTriggers,...n],'trigger'); document.getElementById('custom-trigger-input').value=''; });
+if(document.getElementById('resolve-location')) document.getElementById('resolve-location').addEventListener('click', resolveLocation);
+if(document.getElementById('add-custom-trigger')) document.getElementById('add-custom-trigger').addEventListener('click', ()=>{ const raw=document.getElementById('custom-trigger-input').value.trim().toLowerCase(); if(!raw) return; const c=[...defaultTriggers,...loadCustomTriggers()].map(t=>t.toLowerCase()); if(c.includes(raw)) return; const n=[...loadCustomTriggers(),raw]; saveCustomTriggers(n); createTagButtons(triggerTagsEl,[...defaultTriggers,...n],'trigger'); document.getElementById('custom-trigger-input').value=''; });
 
 if(exportDataBtn) exportDataBtn.onclick=()=>{ const blob=new Blob([JSON.stringify(loadEntries(),null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='migraine-pattern-tracker-backup.json'; a.click(); URL.revokeObjectURL(a.href); };
 if(importDataInput) importDataInput.onchange=async (e)=>{ const f=e.target.files?.[0]; if(!f) return; try{ const data=JSON.parse(await f.text()); if(!Array.isArray(data)) throw new Error('invalid'); saveEntries(data); savedConfirmationEl.textContent='✅ Imported and saved locally'; refresh(); }catch(err){ console.error(err); }};
