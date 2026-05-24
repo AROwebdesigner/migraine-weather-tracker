@@ -82,3 +82,22 @@ legend { color:#6e5b48; font-weight: 600; padding: 0 .35rem; }
 .chart-card canvas{width:100% !important;height:220px !important;}
 
 .clickable-chart{cursor:pointer}.clickable-chart:hover{outline:1px solid var(--border)}#chart-modal canvas{width:100% !important;height:60vh !important;}
+
+
+/* Calendar tab heatmap (modular addition) */
+.calendar-toolbar{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin:.5rem 0 1rem}
+.calendar-heatmap{display:grid;grid-template-columns:repeat(7,minmax(34px,1fr));gap:.42rem}
+.heat-cell{aspect-ratio:1/1;border-radius:8px;background:#efe7db;border:1px solid #e2d7c7;transition:transform .12s ease, box-shadow .12s ease}
+.heat-cell:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(50,35,20,.15)}
+.heat-cell.empty{opacity:.45;background:#f4eee4}
+.sev-0{background:#8bb08a}
+.sev-3{background:#b8cfa7}
+.sev-5{background:#e7d98b}
+.sev-7{background:#e9ae72}
+.sev-9{background:#d7796d}
+.calendar-legend{display:flex;flex-wrap:wrap;gap:.8rem;margin-top:.8rem;color:var(--muted);font-size:.9rem}
+.calendar-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:.35rem;vertical-align:middle}
+@media (prefers-color-scheme: dark){
+  .calendar-heatmap .heat-cell{border-color:#5a4a3a;background:#3d352d}
+  .calendar-heatmap .heat-cell.empty{background:#4a4137}
+}

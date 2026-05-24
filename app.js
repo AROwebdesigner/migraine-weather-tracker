@@ -35,6 +35,47 @@ const chartModalCanvasEl = document.getElementById('chart-modal-canvas');
 const closeChartModalBtn = document.getElementById('close-chart-modal');
 let modalChart = null;
 
+// Calendar heatmap (incremental feature; preserves existing architecture)
+const calendarHeatmapEl = document.getElementById('calendar-heatmap');
+const calendarMonthLabelEl = document.getElementById('calendar-month-label');
+const calendarPrevBtn = document.getElementById('calendar-prev');
+const calendarNextBtn = document.getElementById('calendar-next');
+let calendarCursor = new Date();
+calendarCursor.setDate(1);
+
+function severityClass(sev){
+  if(sev<=2) return 'sev-0';
+  if(sev<=4) return 'sev-3';
+  if(sev<=6) return 'sev-5';
+  if(sev<=8) return 'sev-7';
+  return 'sev-9';
+}
+
+function buildSeverityMap(entries){
+  const map={};
+  entries.forEach(e=>{ if(!e.date) return; const s=Number(e.severity||0); map[e.date]=Math.max(map[e.date]||0,s); });
+  return map;
+}
+
+function renderCalendarHeatmap(entries){
+  if(!calendarHeatmapEl || !calendarMonthLabelEl) return;
+  const y=calendarCursor.getFullYear(); const m=calendarCursor.getMonth();
+  calendarMonthLabelEl.textContent = calendarCursor.toLocaleDateString(undefined,{month:'long', year:'numeric'});
+  const first = new Date(y,m,1); const startOffset=(first.getDay()+6)%7; // monday-first
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const severityMap = buildSeverityMap(entries);
+  const cells=[];
+  for(let i=0;i<startOffset;i++) cells.push('<div class="heat-cell empty"></div>');
+  for(let d=1; d<=daysInMonth; d++){
+    const date = new Date(y,m,d); const key=date.toISOString().slice(0,10);
+    const sev = severityMap[key];
+    if(sev==null) cells.push(`<div class="heat-cell" title="${key}: no migraine logged"></div>`);
+    else cells.push(`<div class="heat-cell ${severityClass(sev)}" title="${key}: severity ${sev}"></div>`);
+  }
+  calendarHeatmapEl.innerHTML = cells.join('');
+}
+
+
 
 document.getElementById('entry-date').valueAsDate = new Date();
 
@@ -248,7 +289,7 @@ function renderPressureInsights(entries){ if(!pressureInsightsEl) return; const 
 function deleteEntry(index){ if(!confirm('Delete this entry?')) return; const entries=loadEntries(); entries.splice(index,1); saveEntries(entries); refresh(); }
 
 function renderDashboard(entries){ renderPressureForecast(entries); renderPressureInsights(entries); }
-function refresh(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); renderTrendCharts(entries); }
+function refresh(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); renderTrendCharts(entries); renderCalendarHeatmap(entries); }
 
 form.addEventListener('submit', async (event)=>{ event.preventDefault(); const city=document.getElementById('location-city').value.trim(); if(!city){ submitStatusEl.textContent='Location required.'; return; } let location=matchedLocation; if(!location) location=await resolveLocation(); if(!location){ submitStatusEl.textContent='Location lookup failed.'; return; }
   const entry={ date:document.getElementById('entry-date').value, severity:Number(document.getElementById('severity').value), sleep:document.getElementById('sleep').value, stress:document.getElementById('stress').value, mealTime:document.getElementById('meal-time').value, caffeine:document.getElementById('caffeine').value, alcohol:document.getElementById('alcohol').value, hydration:document.getElementById('hydration').value, skippedMeals:document.getElementById('skipped-meals').checked, foodNotes:document.getElementById('food-notes').value.trim(), symptoms:selectedTags('symptom'), triggers:selectedTags('trigger'), notes:document.getElementById('notes').value.trim(), location, weather:{}, localStatus:'Saved locally', weatherFetchStatus:'pending', airQuality:{unavailable:true}, pollenFetchStatus:'pending' };
