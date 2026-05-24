@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Migraine Pattern Tracker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="onboarding" class="onboarding hidden">
+      <div class="onboarding-card">
+        <h2>Welcome to Migraine Pattern Tracker</h2>
+        <p>Track symptoms, lifestyle, and environmental patterns in one private, static app.</p>
+        <ul>
+          <li>No account required</li><li>Data saved locally on your device</li><li>Weather and pollen insights powered by Open-Meteo</li>
+        </ul>
+        <button id="start-app">Get started</button>
+      </div>
+    </div>
+
+    <header class="hero">
+      <div class="hero-inner">
+        <h1>Migraine Pattern Tracker</h1>
+        <p class="hero-sub">A personal migraine intelligence dashboard for lifestyle + environmental analytics.</p>
+      </div>
+    </header>
+
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="log">Log Entry</button>
+      <button class="tab" data-tab="dashboard">Analytics</button>
+      <button class="tab" data-tab="entries">History</button>
+    </nav>
+
+    <main class="container">
+      <section id="tab-log" class="tab-panel active card">
+        <h2>Log Entry</h2>
+        <form id="entry-form" class="entry-form">
+          <fieldset><legend>Location for weather & pollen</legend><div class="grid two-col"><label>City / location<input type="text" id="location-city" required placeholder="e.g., Seattle" /></label><label>Country (optional)<input type="text" id="location-country" placeholder="e.g., US" /></label></div><p class="helper">Used only to fetch weather and pollen data for this entry.</p><button type="button" id="resolve-location">Update saved location</button><div id="location-result" class="status"></div></fieldset>
+          <div class="grid two-col"><label>Date<input type="date" id="entry-date" required /></label><label>Migraine severity (0-10)<input type="number" id="severity" min="0" max="10" value="0" required /></label><label>Sleep (hours)<input type="number" id="sleep" min="0" step="0.1" /></label><label>Stress (0-10)<input type="number" id="stress" min="0" max="10" value="0" /></label><label>Meal time<input type="time" id="meal-time" /></label><label>Caffeine intake (mg)<input type="number" id="caffeine" min="0" step="1" /></label><label>Alcohol intake (drinks)<input type="number" id="alcohol" min="0" step="0.5" /></label><label>Hydration level (0-10)<input type="number" id="hydration" min="0" max="10" /></label><label class="inline-checkbox"><input type="checkbox" id="skipped-meals" />Skipped meals today</label></div>
+          <label>Food intake notes<textarea id="food-notes" rows="3" placeholder="Meals, snacks, ingredients..."></textarea></label>
+          <fieldset><legend>Symptoms</legend><div id="symptom-tags" class="tag-grid"></div></fieldset>
+          <fieldset><legend>Possible triggers</legend><div id="trigger-tags" class="tag-grid"></div><div class="custom-trigger-row"><input id="custom-trigger-input" type="text" placeholder="Add custom trigger" /><button type="button" id="add-custom-trigger">Add</button></div></fieldset>
+          <label>Notes<textarea id="notes" rows="3" placeholder="Anything else to remember"></textarea></label>
+          <div id="submit-status" class="status"></div>
+          <button type="submit">Save entry</button>
+        </form>
+      </section>
+
+      <section id="tab-dashboard" class="tab-panel card">
+        <h2>Pressure-First Dashboard</h2><div class="status">Saved locally / Weather pending / Weather failed / Weather added</div><h3>Pressure Forecast</h3><div id="pressure-forecast" class="empty">Loading forecast...</div>
+        <h3>Pressure Timeline (気圧低下)</h3><div id="pressure-timeline" class="empty">No timeline data.</div>
+        <h3>Migraine Forecast (頭痛リスク)</h3><div id="migraine-forecast" class="empty">No forecast yet.</div>
+        <h3>Pressure Pattern Insights</h3><div id="pressure-insights" class="empty">No insights yet.</div>
+      </section>
+
+      <section id="tab-entries" class="tab-panel card">
+        <h2>Recent Entries</h2><div class="data-tools"><button type="button" id="export-data">Export JSON</button><label class="import-btn">Import JSON<input id="import-data" type="file" accept="application/json" /></label><button type="button" id="clear-data">Clear all data</button></div><div id="saved-confirmation" class="status"></div><div id="entries" class="empty">No entries yet.</div>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
