@@ -26,6 +26,13 @@ const avg = (arr)=>Array.isArray(arr)&&arr.length?Number((arr.filter(v=>v!=null)
 function humidityCategory(h){ if(h==null||h==='') return 'Not available'; const n=Number(h); if(n>=75) return 'High'; if(n>=45) return 'Moderate'; return 'Low'; }
 const fmt=(v,unit='')=>v==null||v===''?'Not available':`${Number(v).toFixed(1)}${unit}`;
 
+function fetchWithTimeout(url, timeoutMs = 5000){
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeout));
+}
+
+
 async function resolveLocation(){
   const city = document.getElementById('location-city').value.trim();
   const country = document.getElementById('location-country').value.trim();
@@ -34,9 +41,9 @@ async function resolveLocation(){
   try{
     locationResultEl.textContent='Looking up location...';
     const q = encodeURIComponent(city);
-    const cc = country ? `&country=${encodeURIComponent(country)}` : '';
+    const cc = country ? `&countryCode=${encodeURIComponent(country)}` : '';
     const url = `https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=1&language=en&format=json${cc}`;
-    const r = await fetch(url);
+    const r = await fetchWithTimeout(url, 5000);
     if(!r.ok) throw new Error(`Geocoding HTTP ${r.status}`);
     const data = await r.json();
     if(!data.results?.length){ matchedLocation=null; locationResultEl.textContent='No location match found. Try city + country (e.g., Tokyo + JP).'; return null; }
@@ -70,7 +77,7 @@ async function fetchEnv(date, lat, lon){
 
   let weather = {}; let weatherFetchStatus='success';
   try {
-    const [w, wp] = await Promise.all([fetch(weatherUrl), fetch(prevUrl)]);
+    const [w, wp] = await Promise.all([fetchWithTimeout(weatherUrl, 5000), fetchWithTimeout(prevUrl, 5000)]);
     if(!w.ok || !wp.ok) throw new Error(`Weather HTTP ${w.status}/${wp.status}`);
     const wd = await w.json(); const wpd = await wp.json();
     const h = wd.hourly || {}; const ph = wpd.hourly || {};
@@ -94,7 +101,7 @@ async function fetchEnv(date, lat, lon){
 
   let airQuality = { unavailable: true }; let pollenFetchStatus = 'not_available';
   try {
-    const a = await fetch(airUrl);
+    const a = await fetchWithTimeout(airUrl, 5000);
     if(!a.ok) throw new Error(`Air quality HTTP ${a.status}`);
     const ad = await a.json(); const h = ad.hourly || {};
     airQuality = { pm2_5: avg(h.pm2_5), pm10: avg(h.pm10), dust: avg(h.dust) };
@@ -111,16 +118,38 @@ async function fetchEnv(date, lat, lon){
 function envRisk(entry){ let score=0; if((entry.weather?.pressureChange ?? 0)<=-4) score+=2; if(entry.weather?.humidityCategory==='High') score+=1; if(entry.weather?.rain) score+=1; const pvals=pollenKeys.map(k=>entry.airQuality?.[k]).filter(v=>v!=null); if(pvals.some(v=>v>=30)) score+=2; if((entry.airQuality?.pm2_5??0)>=25) score+=1; if((entry.airQuality?.pm10??0)>=50) score+=1; return Math.min(score,10); }
 function renderDashboard(entries){ if(!entries.length){ dashboardEl.innerHTML='<p>Add entries to reveal patterns.</p>'; return; } const severe=entries.filter(e=>e.severity>=6); const pct=(n,d)=>d?`${((n/d)*100).toFixed(0)}%`:'0%'; const highHumidity=severe.filter(e=>e.weather?.humidityCategory==='High').length; const rain=severe.filter(e=>e.weather?.rain).length; const pressureDrop=severe.filter(e=>(e.weather?.pressureChange??999)<=-4).length; const highPollen=severe.filter(e=>pollenKeys.some(k=>(e.airQuality?.[k]??0)>=30)).length; const pmBad=severe.filter(e=>(e.airQuality?.pm2_5??0)>=25||(e.airQuality?.pm10??0)>=50).length; const avgRisk=(entries.reduce((s,e)=>s+envRisk(e),0)/entries.length).toFixed(1); dashboardEl.innerHTML=`<div class="metric"><strong>Pressure drops on severe days:</strong> ${pressureDrop}/${severe.length} (${pct(pressureDrop,severe.length)})</div><div class="metric"><strong>High humidity on severe days:</strong> ${highHumidity}/${severe.length} (${pct(highHumidity,severe.length)})</div><div class="metric"><strong>Rain on severe days:</strong> ${rain}/${severe.length} (${pct(rain,severe.length)})</div><div class="metric"><strong>High pollen on severe days:</strong> ${highPollen}/${severe.length} (${pct(highPollen,severe.length)})</div><div class="metric"><strong>PM2.5/PM10 elevated on severe days:</strong> ${pmBad}/${severe.length} (${pct(pmBad,severe.length)})</div><div class="metric"><strong>Average environmental risk score:</strong> ${avgRisk}/10</div>`; }
 
-function retryWeather(index){ return async ()=>{ const entries=loadEntries(); const e=entries[index]; if(!e?.location){ return; } submitStatusEl.textContent='Retrying weather and pollen fetch...'; const env=await fetchEnv(e.date, e.location.latitude, e.location.longitude); entries[index]={...e,...env}; saveEntries(entries); submitStatusEl.textContent='Retry complete.'; refresh(); }; }
+function retryWeather(index){ return async ()=>{ submitStatusEl.textContent='Retrying weather and pollen fetch...'; await refreshEntryWeather(index); submitStatusEl.textContent='Retry complete.'; }; }
 function renderEntries(entries){ entriesEl.innerHTML=''; entries.slice().reverse().forEach((e,reverseIdx)=>{ const idx=entries.length-1-reverseIdx; const card=document.createElement('article'); card.className='entry-item'; card.innerHTML=`<h3>${e.date} · Severity ${e.severity}/10</h3><p><strong>Location:</strong> ${e.location?.name || 'Not available'}, ${e.location?.country || ''}</p><p><strong>Weather:</strong> Temp ${fmt(e.weather?.temperature,'°C')}, Humidity ${fmt(e.weather?.humidity,'%')} (${e.weather?.humidityCategory||'Not available'}), Precip ${fmt(e.weather?.precipitation,' mm')}, Pressure ${fmt(e.weather?.pressure,' hPa')}, ΔPressure ${fmt(e.weather?.pressureChange,' hPa')}, Rain: ${e.weather?.rain ? 'Yes':'No'}</p><p><strong>Pollen/Air:</strong> Birch ${fmt(e.airQuality?.birch_pollen)}, Grass ${fmt(e.airQuality?.grass_pollen)}, Mugwort ${fmt(e.airQuality?.mugwort_pollen)}, Olive ${fmt(e.airQuality?.olive_pollen)}, Ragweed ${fmt(e.airQuality?.ragweed_pollen)}, Alder ${fmt(e.airQuality?.alder_pollen)}, Dust ${fmt(e.airQuality?.dust)}, PM2.5 ${fmt(e.airQuality?.pm2_5)}, PM10 ${fmt(e.airQuality?.pm10)}</p><p><strong>Fetch status:</strong> Weather ${e.weatherFetchStatus || 'unknown'} · Pollen ${e.pollenFetchStatus || 'unknown'}</p><p><strong>Env risk score:</strong> ${envRisk(e)}/10</p>`; const b=document.createElement('button'); b.type='button'; b.textContent='Retry weather data'; b.onclick=retryWeather(idx); card.appendChild(b); entriesEl.appendChild(card); }); }
 function refresh(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); }
 
 document.getElementById('resolve-location').addEventListener('click', resolveLocation);
 document.getElementById('add-custom-trigger').addEventListener('click', ()=>{ const raw=document.getElementById('custom-trigger-input').value.trim().toLowerCase(); if(!raw) return; const combined=[...defaultTriggers,...loadCustomTriggers()].map(t=>t.toLowerCase()); if(combined.includes(raw)) return; const next=[...loadCustomTriggers(),raw]; saveCustomTriggers(next); createTagButtons(triggerTagsEl,[...defaultTriggers,...next],'trigger'); document.getElementById('custom-trigger-input').value=''; });
 
-form.addEventListener('submit', async (event)=>{ event.preventDefault(); submitStatusEl.textContent='Saving entry...'; const city = document.getElementById('location-city').value.trim(); if(!city){ submitStatusEl.textContent='Location is required before weather fetch.'; return; } let location = matchedLocation; if(!location) location = await resolveLocation(); if(!location){ submitStatusEl.textContent='Please fix location before saving.'; return; } let env = { weather: {}, weatherFetchStatus: 'failed', airQuality: { unavailable: true }, pollenFetchStatus: 'failed' }; try { env = await fetchEnv(document.getElementById('entry-date').value, location.latitude, location.longitude); submitStatusEl.textContent = (env.weatherFetchStatus==='success') ? 'Entry saved with weather and pollen data.' : 'Entry saved. Weather or pollen data could not be fully fetched.'; } catch(err){ console.error('Unexpected env fetch error', err); submitStatusEl.textContent='Entry saved, but environmental fetch hit an unexpected error.'; }
-  const entry = { date: document.getElementById('entry-date').value, severity:Number(document.getElementById('severity').value), sleep:document.getElementById('sleep').value, stress:document.getElementById('stress').value, mealTime:document.getElementById('meal-time').value, caffeine:document.getElementById('caffeine').value, alcohol:document.getElementById('alcohol').value, hydration:document.getElementById('hydration').value, skippedMeals:document.getElementById('skipped-meals').checked, foodNotes:document.getElementById('food-notes').value.trim(), symptoms:selectedTags('symptom'), triggers:selectedTags('trigger'), notes:document.getElementById('notes').value.trim(), location, ...env };
-  const entries=loadEntries(); entries.push(entry); saveEntries(entries); form.reset(); document.getElementById('entry-date').valueAsDate = new Date(); document.querySelectorAll('.tag.active').forEach(el=>el.classList.remove('active')); refresh();
+async function refreshEntryWeather(index){
+  const entries = loadEntries();
+  const e = entries[index];
+  if(!e?.location) return;
+  entries[index] = { ...e, weatherFetchStatus: 'pending', pollenFetchStatus: 'pending' };
+  saveEntries(entries); refresh();
+  try {
+    const env = await fetchEnv(e.date, e.location.latitude, e.location.longitude);
+    const latest = loadEntries();
+    latest[index] = { ...latest[index], ...env };
+    saveEntries(latest);
+  } catch (err) {
+    console.error('Background weather refresh failed', err);
+    const latest = loadEntries();
+    latest[index] = { ...latest[index], weatherFetchStatus: 'failed', pollenFetchStatus: 'failed' };
+    saveEntries(latest);
+  }
+  refresh();
+}
+
+form.addEventListener('submit', async (event)=>{ event.preventDefault(); submitStatusEl.textContent='Saving entry...'; const city = document.getElementById('location-city').value.trim(); if(!city){ submitStatusEl.textContent='Location is required before weather fetch.'; return; } let location = matchedLocation; if(!location) location = await resolveLocation(); if(!location){ submitStatusEl.textContent='Please fix location before saving.'; return; }
+  const entry = { date: document.getElementById('entry-date').value, severity:Number(document.getElementById('severity').value), sleep:document.getElementById('sleep').value, stress:document.getElementById('stress').value, mealTime:document.getElementById('meal-time').value, caffeine:document.getElementById('caffeine').value, alcohol:document.getElementById('alcohol').value, hydration:document.getElementById('hydration').value, skippedMeals:document.getElementById('skipped-meals').checked, foodNotes:document.getElementById('food-notes').value.trim(), symptoms:selectedTags('symptom'), triggers:selectedTags('trigger'), notes:document.getElementById('notes').value.trim(), location, weather: {}, weatherFetchStatus: 'pending', airQuality: { unavailable: true }, pollenFetchStatus: 'pending' };
+  const entries=loadEntries(); entries.push(entry); const newIndex = entries.length - 1; saveEntries(entries); submitStatusEl.textContent='Entry saved. Fetching weather and pollen in background...';
+  form.reset(); document.getElementById('entry-date').valueAsDate = new Date(); document.querySelectorAll('.tag.active').forEach(el=>el.classList.remove('active')); refresh();
+  refreshEntryWeather(newIndex);
 });
 
 const saved=loadSavedLocation(); if(saved){ document.getElementById('location-city').value=saved.city||''; document.getElementById('location-country').value=saved.country||''; matchedLocation=saved.matchedLocation||null; if(matchedLocation){ locationResultEl.innerHTML=`Saved: <strong>${matchedLocation.name}, ${matchedLocation.country}</strong> (${matchedLocation.latitude.toFixed(4)}, ${matchedLocation.longitude.toFixed(4)})`; }}
