@@ -29,6 +29,11 @@ const chartEls = {
   symptoms: document.getElementById('chart-symptoms')
 };
 const chartCache = {};
+const chartModalEl = document.getElementById('chart-modal');
+const chartModalTitleEl = document.getElementById('chart-modal-title');
+const chartModalCanvasEl = document.getElementById('chart-modal-canvas');
+const closeChartModalBtn = document.getElementById('close-chart-modal');
+let modalChart = null;
 
 
 document.getElementById('entry-date').valueAsDate = new Date();
@@ -161,7 +166,7 @@ function statusSummary(entry){
 }
 
 function retryWeather(index){ return async ()=>{ try { submitStatusEl.textContent='Retrying weather...'; await refreshEntryWeather(index); submitStatusEl.textContent='Weather retry finished.'; } catch (e) { console.error('Retry weather failed', e); submitStatusEl.textContent='Weather failed.'; } }; }
-function renderEntries(entries){ entriesEl.innerHTML=''; if(!entries.length){ entriesEl.innerHTML='<p class="empty">No entries yet.</p>'; return; } entries.slice().reverse().forEach((e,ri)=>{const idx=entries.length-1-ri; const card=document.createElement('article'); card.className='entry-item'; card.innerHTML=`<h3>${e.date} · Severity ${e.severity}/10</h3><p><strong>Pressure:</strong> ${fmt(e.weather?.pressure,' hPa')} · <strong>Pressure change:</strong> ${fmt(e.weather?.pressureChange,' hPa')}</p><p><strong>Humidity:</strong> ${fmt(e.weather?.humidity,'%')} · <strong>Rain:</strong> ${e.weather?.rain?'Yes':'No'} · <strong>PM2.5:</strong> ${fmt(e.airQuality?.pm2_5)} · <strong>Pollen:</strong> ${fmt(e.airQuality?.birch_pollen)}</p><p><strong>Weather:</strong> ${e.weatherFetchStatus||'pending'} · <strong>Pollen:</strong> ${e.pollenFetchStatus||'pending'}</p><p><strong>Status:</strong> ${statusSummary(e)}</p>`; const b=document.createElement('button'); b.textContent='Retry weather'; b.onclick=retryWeather(idx); card.appendChild(b); entriesEl.appendChild(card); }); }
+function renderEntries(entries){ entriesEl.innerHTML=''; if(!entries.length){ entriesEl.innerHTML='<p class="empty">No entries yet.</p>'; return; } entries.slice().reverse().forEach((e,ri)=>{const idx=entries.length-1-ri; const card=document.createElement('article'); card.className='entry-item'; card.innerHTML=`<h3>${e.date} · Severity ${e.severity}/10</h3><p><strong>Pressure:</strong> ${fmt(e.weather?.pressure,' hPa')} · <strong>Pressure change:</strong> ${fmt(e.weather?.pressureChange,' hPa')}</p><p><strong>Humidity:</strong> ${fmt(e.weather?.humidity,'%')} · <strong>Rain:</strong> ${e.weather?.rain?'Yes':'No'} · <strong>PM2.5:</strong> ${fmt(e.airQuality?.pm2_5)} · <strong>Pollen:</strong> ${fmt(e.airQuality?.birch_pollen)}</p><p><strong>Weather:</strong> ${e.weatherFetchStatus||'pending'} · <strong>Pollen:</strong> ${e.pollenFetchStatus||'pending'}</p><p><strong>Status:</strong> ${statusSummary(e)}</p>`; const b=document.createElement('button'); b.textContent='Retry weather'; b.onclick=retryWeather(idx); const d=document.createElement('button'); d.type='button'; d.textContent='Delete'; d.onclick=()=>deleteEntry(idx); card.appendChild(b); card.appendChild(d); entriesEl.appendChild(card); }); }
 
 function renderPressureForecast(entries){
   if(!pressureForecastEl) return;
@@ -176,8 +181,29 @@ function renderPressureForecast(entries){
   }).catch(()=>{ pressureForecastEl.innerHTML='<p class="empty">Forecast unavailable.</p>'; });
 }
 
+
+function emptyChartState(canvas, message='Add more entries to see this chart.'){
+  if(!canvas) return;
+  const card = canvas.closest('.chart-card');
+  if(card){
+    if(!card.querySelector('.chart-empty')){ const p=document.createElement('p'); p.className='empty chart-empty'; p.textContent=message; card.appendChild(p);} 
+  }
+}
+function clearChartEmpty(canvas){ const card=canvas?.closest('.chart-card'); const n=card?.querySelector('.chart-empty'); if(n) n.remove(); }
+
+function openChartModal(key){
+  if(!chartModalEl || !window.Chart || !chartEls[key]) return;
+  const src = chartCache[key];
+  if(!src) return;
+  chartModalTitleEl.textContent = src.config.data.datasets?.[0]?.label || key;
+  chartModalEl.classList.remove('hidden');
+  if(modalChart) modalChart.destroy();
+  modalChart = new Chart(chartModalCanvasEl.getContext('2d'), JSON.parse(JSON.stringify(src.config)));
+}
+
 function upsertChart(key, config){
   if(!window.Chart || !chartEls[key]) return;
+  clearChartEmpty(chartEls[key]);
   if(chartCache[key]) chartCache[key].destroy();
   chartCache[key] = new Chart(chartEls[key].getContext('2d'), config);
 }
@@ -186,17 +212,17 @@ function renderTrendCharts(entries){
   if(!window.Chart) return;
   const sorted=[...entries].sort((x,y)=>x.date.localeCompare(y.date));
   const labels=sorted.map(e=>e.date);
-  upsertChart('severity',{type:'line',data:{labels,datasets:[{label:'Severity',data:sorted.map(e=>e.severity),borderColor:'#8a735d',backgroundColor:'rgba(138,115,93,.2)'}]},options:{responsive:true,maintainAspectRatio:false}});
+  if(sorted.length<2){emptyChartState(chartEls.severity); if(chartCache.severity){chartCache.severity.destroy(); delete chartCache.severity;}} else upsertChart('severity',{type:'line',data:{labels,datasets:[{label:'Severity',data:sorted.map(e=>e.severity),borderColor:'#8a735d',backgroundColor:'rgba(138,115,93,.2)'}]},options:{responsive:true,maintainAspectRatio:false}});
 
   const pressurePts=sorted.filter(e=>e.weather?.pressure!=null).map(e=>({x:e.weather.pressure,y:e.severity}));
-  upsertChart('pressure',{type:'scatter',data:{datasets:[{label:'Pressure vs Severity',data:pressurePts,backgroundColor:'#6f7f5f'}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{display:true,text:'Pressure'}},y:{title:{display:true,text:'Severity'}}}}});
+  if(pressurePts.length<2){emptyChartState(chartEls.pressure); if(chartCache.pressure){chartCache.pressure.destroy(); delete chartCache.pressure;}} else upsertChart('pressure',{type:'scatter',data:{datasets:[{label:'Pressure vs Severity',data:pressurePts,backgroundColor:'#6f7f5f'}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{display:true,text:'Pressure'}},y:{title:{display:true,text:'Severity'}}}}});
 
   const sleepPts=sorted.filter(e=>e.sleep!==''&&e.sleep!=null).map(e=>({x:Number(e.sleep),y:e.severity}));
-  upsertChart('sleep',{type:'scatter',data:{datasets:[{label:'Sleep vs Severity',data:sleepPts,backgroundColor:'#9b856e'}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{display:true,text:'Sleep (h)'}},y:{title:{display:true,text:'Severity'}}}}});
+  if(sleepPts.length<2){emptyChartState(chartEls.sleep); if(chartCache.sleep){chartCache.sleep.destroy(); delete chartCache.sleep;}} else upsertChart('sleep',{type:'scatter',data:{datasets:[{label:'Sleep vs Severity',data:sleepPts,backgroundColor:'#9b856e'}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{display:true,text:'Sleep (h)'}},y:{title:{display:true,text:'Severity'}}}}});
 
   const tc={}; const sc={}; sorted.forEach(e=>{(e.triggers||[]).forEach(t=>tc[t]=(tc[t]||0)+1); (e.symptoms||[]).forEach(t=>sc[t]=(sc[t]||0)+1);});
-  upsertChart('triggers',{type:'bar',data:{labels:Object.keys(tc),datasets:[{label:'Trigger frequency',data:Object.values(tc),backgroundColor:'#6f7f5f'}]},options:{responsive:true,maintainAspectRatio:false}});
-  upsertChart('symptoms',{type:'bar',data:{labels:Object.keys(sc),datasets:[{label:'Symptom frequency',data:Object.values(sc),backgroundColor:'#8a735d'}]},options:{responsive:true,maintainAspectRatio:false}});
+  if(Object.keys(tc).length<1){emptyChartState(chartEls.triggers); if(chartCache.triggers){chartCache.triggers.destroy(); delete chartCache.triggers;}} else upsertChart('triggers',{type:'bar',data:{labels:Object.keys(tc),datasets:[{label:'Trigger frequency',data:Object.values(tc),backgroundColor:'#6f7f5f'}]},options:{responsive:true,maintainAspectRatio:false}});
+  if(Object.keys(sc).length<1){emptyChartState(chartEls.symptoms); if(chartCache.symptoms){chartCache.symptoms.destroy(); delete chartCache.symptoms;}} else upsertChart('symptoms',{type:'bar',data:{labels:Object.keys(sc),datasets:[{label:'Symptom frequency',data:Object.values(sc),backgroundColor:'#8a735d'}]},options:{responsive:true,maintainAspectRatio:false}});
 }
 
 function renderPressureTimeline(hourly, entries){
@@ -219,6 +245,8 @@ function renderMigraineForecast(r){
 }
 function renderPressureInsights(entries){ if(!pressureInsightsEl) return; const m=entries.filter(e=>e.severity>=6); if(!m.length){ pressureInsightsEl.innerHTML='<p class="empty">No migraine history yet.</p>'; return; } const rainDays=m.filter(e=>e.weather?.rain).length; const humid=m.filter(e=>(e.weather?.humidity||0)>75).length; pressureInsightsEl.innerHTML=`<div class="metric">Pressure on migraine days: ${fmt(avg(m.map(e=>e.weather?.pressure).filter(Boolean)),' hPa')}</div><div class="metric">6h/24h drop indicator: ${m.filter(e=>(e.weather?.pressureChange||0)<=-3).length}/${m.length}</div><div class="metric">Rain on migraine days: ${rainDays}/${m.length}</div><div class="metric">High humidity days: ${humid}/${m.length}</div>`; }
 
+function deleteEntry(index){ if(!confirm('Delete this entry?')) return; const entries=loadEntries(); entries.splice(index,1); saveEntries(entries); refresh(); }
+
 function renderDashboard(entries){ renderPressureForecast(entries); renderPressureInsights(entries); }
 function refresh(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); renderTrendCharts(entries); }
 
@@ -238,6 +266,7 @@ const saved=loadSavedLocation(); if(saved){ document.getElementById('location-ci
 createTagButtons(symptomTagsEl, symptomOptions, 'symptom');
 createTagButtons(triggerTagsEl, [...defaultTriggers,...loadCustomTriggers()], 'trigger');
 bindTabs();
+bindChartModal();
 refresh();
 
 
@@ -259,3 +288,5 @@ function bindTabs(){
     if(panel) panel.classList.add('active');
   }));
 }
+
+function bindChartModal(){ document.querySelectorAll('.clickable-chart').forEach(el=>el.addEventListener('click', ()=>openChartModal(el.dataset.chart))); if(closeChartModalBtn) closeChartModalBtn.addEventListener('click', ()=>{ chartModalEl.classList.add('hidden'); if(modalChart){modalChart.destroy(); modalChart=null;} }); }

@@ -50,13 +50,14 @@
         <h2>Pressure-First Dashboard</h2><div class="status">Saved locally / Weather pending / Weather failed / Weather added</div><h3>Pressure Forecast</h3><div id="pressure-forecast" class="empty">Loading forecast...</div>
         <h3>Pressure Timeline (気圧低下)</h3><div id="pressure-timeline" class="empty">No timeline data.</div>
         <h3>Migraine Forecast (頭痛リスク)</h3><div id="migraine-forecast" class="empty">No forecast yet.</div>
-        <h3>Pressure Pattern Insights</h3><div id="pressure-insights" class="empty">No insights yet.</div><h3>Trend Charts</h3><div id="trend-charts" class="trends-grid"><div class="chart-card"><h4>Migraine severity over time</h4><canvas id="chart-severity"></canvas></div><div class="chart-card"><h4>Pressure vs migraine severity</h4><canvas id="chart-pressure"></canvas></div><div class="chart-card"><h4>Sleep vs severity</h4><canvas id="chart-sleep"></canvas></div><div class="chart-card"><h4>Trigger frequency</h4><canvas id="chart-triggers"></canvas></div><div class="chart-card"><h4>Symptom frequency</h4><canvas id="chart-symptoms"></canvas></div></div>
+        <h3>Pressure Pattern Insights</h3><div id="pressure-insights" class="empty">No insights yet.</div><h3>Trend Charts</h3><div id="trend-charts" class="trends-grid"><div class="chart-card clickable-chart" data-chart="severity"><h4>Migraine severity over time</h4><canvas id="chart-severity"></canvas></div><div class="chart-card clickable-chart" data-chart="pressure"><h4>Pressure vs migraine severity</h4><canvas id="chart-pressure"></canvas></div><div class="chart-card clickable-chart" data-chart="sleep"><h4>Sleep vs severity</h4><canvas id="chart-sleep"></canvas></div><div class="chart-card clickable-chart" data-chart="triggers"><h4>Trigger frequency</h4><canvas id="chart-triggers"></canvas><p class="helper">Shows how often each trigger appears in saved entries.</p></div><div class="chart-card clickable-chart" data-chart="symptoms"><h4>Symptom frequency</h4><canvas id="chart-symptoms"></canvas><p class="helper">Shows how often each symptom appears in saved entries.</p></div></div>
       </section>
 
       <section id="tab-entries" class="tab-panel card">
         <h2>Recent Entries</h2><div class="data-tools"><button type="button" id="export-data">Export JSON</button><label class="import-btn">Import JSON<input id="import-data" type="file" accept="application/json" /></label><button type="button" id="clear-data">Clear all data</button></div><div id="saved-confirmation" class="status"></div><div id="entries" class="empty">No entries yet.</div>
       </section>
     </main>
+    <div id="chart-modal" class="onboarding hidden"><div class="onboarding-card"><button id="close-chart-modal" type="button">Close</button><h3 id="chart-modal-title">Chart</h3><canvas id="chart-modal-canvas"></canvas></div></div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="fix.js"></script>
     <script src="app.js"></script>

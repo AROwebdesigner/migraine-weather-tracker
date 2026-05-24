@@ -80,3 +80,5 @@ legend { color:#6e5b48; font-weight: 600; padding: 0 .35rem; }
 .data-tools{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}.import-btn{background:var(--primary);color:#fff;padding:.6rem .9rem;border-radius:11px;font-weight:600;cursor:pointer}.import-btn input{display:none}
 
 .chart-card canvas{width:100% !important;height:220px !important;}
+
+.clickable-chart{cursor:pointer}.clickable-chart:hover{outline:1px solid var(--border)}#chart-modal canvas{width:100% !important;height:60vh !important;}
