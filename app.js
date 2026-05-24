@@ -124,3 +124,93 @@ form.addEventListener('submit', async (event)=>{ event.preventDefault(); submitS
 
 const saved=loadSavedLocation(); if(saved){ document.getElementById('location-city').value=saved.city||''; document.getElementById('location-country').value=saved.country||''; matchedLocation=saved.matchedLocation||null; if(matchedLocation){ locationResultEl.innerHTML=`Saved: <strong>${matchedLocation.name}, ${matchedLocation.country}</strong> (${matchedLocation.latitude.toFixed(4)}, ${matchedLocation.longitude.toFixed(4)})`; }}
 createTagButtons(symptomTagsEl, symptomOptions, 'symptom'); createTagButtons(triggerTagsEl, [...defaultTriggers,...loadCustomTriggers()], 'trigger'); refresh();
+
+
+const rangeFilterEl = document.getElementById('range-filter');
+const triggerFilterEl = document.getElementById('trigger-filter');
+const symptomFilterEl = document.getElementById('symptom-filter');
+const summaryCardsEl = document.getElementById('summary-cards');
+const trendsGridEl = document.getElementById('trends-grid');
+const calendarViewEl = document.getElementById('calendar-view');
+
+function corr(points){
+  const n=points.length; if(n<2) return null;
+  const sx=points.reduce((a,p)=>a+p.x,0), sy=points.reduce((a,p)=>a+p.y,0);
+  const mx=sx/n,my=sy/n; let num=0,dx=0,dy=0;
+  points.forEach(p=>{const a=p.x-mx,b=p.y-my; num+=a*b; dx+=a*a; dy+=b*b;});
+  if(!dx||!dy) return null; return num/Math.sqrt(dx*dy);
+}
+function filterEntries(entries){
+  const range=rangeFilterEl?.value||'30'; const t=triggerFilterEl?.value||'all'; const s=symptomFilterEl?.value||'all';
+  let out=[...entries]; if(range!=='all'){ const d=new Date(); d.setDate(d.getDate()-Number(range)); out=out.filter(e=>new Date(e.date)>=d); }
+  if(t!=='all') out=out.filter(e=>(e.triggers||[]).includes(t));
+  if(s!=='all') out=out.filter(e=>(e.symptoms||[]).includes(s));
+  return out.sort((a,b)=>a.date.localeCompare(b.date));
+}
+function lineChart(title, points, yLabel){
+  if(!points.length) return `<div class="chart-card"><h4>${title}</h4><p>No data.</p></div>`;
+  const w=320,h=140,p=20; const min=Math.min(...points.map(p=>p.y)), max=Math.max(...points.map(p=>p.y)); const span=(max-min)||1;
+  const path=points.map((pt,i)=>`${i?'L':'M'} ${p+i*(w-2*p)/Math.max(1,points.length-1)} ${h-p-((pt.y-min)/span)*(h-2*p)}`).join(' ');
+  const dots=points.map((pt,i)=>`<circle cx="${p+i*(w-2*p)/Math.max(1,points.length-1)}" cy="${h-p-((pt.y-min)/span)*(h-2*p)}" r="2.5"><title>${pt.label}: ${pt.y}</title></circle>`).join('');
+  return `<div class="chart-card"><h4>${title}</h4><svg viewBox="0 0 ${w} ${h}"><path d="${path}" class="line"/>${dots}</svg><p>${yLabel}</p></div>`;
+}
+function barChart(title, rows){
+  if(!rows.length) return `<div class="chart-card"><h4>${title}</h4><p>No data.</p></div>`;
+  const top=Math.max(...rows.map(r=>r.value),1);
+  return `<div class="chart-card"><h4>${title}</h4>${rows.slice(0,8).map(r=>`<div class="bar-row"><span>${r.label}</span><div class="bar"><i style="width:${(r.value/top)*100}%"></i></div><b>${r.value}</b></div>`).join('')}</div>`;
+}
+function renderTrends(entries){
+  if(!trendsGridEl) return;
+  const filtered=filterEntries(entries);
+  if(!filtered.length){ trendsGridEl.innerHTML='<p>No entries for selected filters.</p>'; summaryCardsEl.innerHTML=''; calendarViewEl.innerHTML=''; return; }
+  const p=(f)=>filtered.filter(e=>e[f]!=null&&e[f]!=='').map(e=>({label:e.date,y:Number(e[f])}));
+  const pw=(f)=>filtered.filter(e=>e.weather?.[f]!=null).map(e=>({label:e.date,y:Number(e.weather[f])}));
+  const sev=filtered.map(e=>({label:e.date,y:Number(e.severity)}));
+  const pollen=filtered.map(e=>({label:e.date,y: [e.airQuality?.birch_pollen,e.airQuality?.grass_pollen,e.airQuality?.mugwort_pollen,e.airQuality?.olive_pollen,e.airQuality?.ragweed_pollen,e.airQuality?.alder_pollen].filter(v=>v!=null).reduce((a,b)=>a+b,0)})).filter(x=>x.y>0);
+  const triggerCounts={}; const symptomCounts={};
+  filtered.forEach(e=>{(e.triggers||[]).forEach(t=>triggerCounts[t]=(triggerCounts[t]||0)+1); (e.symptoms||[]).forEach(t=>symptomCounts[t]=(symptomCounts[t]||0)+1);});
+  trendsGridEl.innerHTML = [
+    lineChart('Migraine severity over time', sev, 'Severity 0-10'),
+    lineChart('Air pressure over time', pw('pressure'), 'hPa'),
+    lineChart('Humidity over time', pw('humidity'), '%'),
+    lineChart('Sleep quality vs migraine severity', p('sleep'), 'hours (compare with severity line visually)'),
+    lineChart('Stress level vs migraine severity', p('stress'), 'stress score'),
+    lineChart('Hydration vs migraine severity', p('hydration'), 'hydration score'),
+    lineChart('Caffeine intake vs migraine severity', p('caffeine'), 'mg'),
+    lineChart('Pollen level vs migraine severity', pollen, 'total pollen index'),
+    barChart('Trigger frequency over time', Object.entries(triggerCounts).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value)),
+    barChart('Symptom frequency over time', Object.entries(symptomCounts).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value)),
+  ].join('');
+
+  const avg=(arr)=>arr.length?(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1):'N/A';
+  const strongest=[
+    {label:'Sleep vs Severity',v:corr(filtered.filter(e=>e.sleep!=='').map(e=>({x:Number(e.sleep),y:Number(e.severity)})))},
+    {label:'Stress vs Severity',v:corr(filtered.filter(e=>e.stress!=='').map(e=>({x:Number(e.stress),y:Number(e.severity)})))},
+    {label:'Hydration vs Severity',v:corr(filtered.filter(e=>e.hydration!=='').map(e=>({x:Number(e.hydration),y:Number(e.severity)})))},
+    {label:'Pressure vs Severity',v:corr(filtered.filter(e=>e.weather?.pressure!=null).map(e=>({x:Number(e.weather.pressure),y:Number(e.severity)})))},
+  ].filter(x=>x.v!=null).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v))[0];
+  const topTrig=Object.entries(triggerCounts).sort((a,b)=>b[1]-a[1])[0]?.[0]||'N/A';
+  const topSym=Object.entries(symptomCounts).sort((a,b)=>b[1]-a[1])[0]?.[0]||'N/A';
+  summaryCardsEl.innerHTML = `
+    <div class="sum-card"><strong>Average migraine severity</strong><span>${avg(filtered.map(e=>Number(e.severity)))}</span></div>
+    <div class="sum-card"><strong>Number of migraine days</strong><span>${filtered.filter(e=>Number(e.severity)>0).length}</span></div>
+    <div class="sum-card"><strong>Most common trigger</strong><span>${topTrig}</span></div>
+    <div class="sum-card"><strong>Most common symptom</strong><span>${topSym}</span></div>
+    <div class="sum-card"><strong>Average sleep quality</strong><span>${avg(filtered.filter(e=>e.sleep!=='').map(e=>Number(e.sleep)))}</span></div>
+    <div class="sum-card"><strong>Average stress level</strong><span>${avg(filtered.filter(e=>e.stress!=='').map(e=>Number(e.stress)))}</span></div>
+    <div class="sum-card"><strong>Average air pressure</strong><span>${avg(filtered.filter(e=>e.weather?.pressure!=null).map(e=>Number(e.weather.pressure)))}</span></div>
+    <div class="sum-card"><strong>Strongest suspected correlation</strong><span>${strongest?`${strongest.label} (${strongest.v.toFixed(2)})`:'N/A'}</span></div>`;
+
+  calendarViewEl.innerHTML = filtered.map(e=>{const s=Number(e.severity)||0; const op=0.15+s/12; const dot=(e.weather?.rain?'🌧️':'')+(e.airQuality?.pm2_5?'🌿':''); return `<div class="day" style="background:rgba(43,109,233,${op})" title="${e.date} severity ${s}">${e.date.slice(5)}<small>${s}/10 ${dot}</small></div>`;}).join('');
+}
+
+function populateTrendFilters(entries){
+  if(!triggerFilterEl||!symptomFilterEl) return;
+  const ts=[...new Set(entries.flatMap(e=>e.triggers||[]))].sort(); const ss=[...new Set(entries.flatMap(e=>e.symptoms||[]))].sort();
+  triggerFilterEl.innerHTML='<option value="all">All triggers</option>'+ts.map(t=>`<option value="${t}">${t}</option>`).join('');
+  symptomFilterEl.innerHTML='<option value="all">All symptoms</option>'+ss.map(t=>`<option value="${t}">${t}</option>`).join('');
+}
+
+const _refresh = refresh;
+refresh = function(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); populateTrendFilters(entries); renderTrends(entries); }
+if(rangeFilterEl){ [rangeFilterEl,triggerFilterEl,symptomFilterEl].forEach(el=>el?.addEventListener('change', ()=>refresh())); }

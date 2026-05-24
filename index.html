@@ -26,7 +26,6 @@
             <button type="button" id="resolve-location">Update saved location</button>
             <div id="location-result" class="status"></div>
           </fieldset>
-
           <div class="grid two-col">
             <label>Date<input type="date" id="entry-date" required /></label>
             <label>Migraine severity (0-10)<input type="number" id="severity" min="0" max="10" value="0" required /></label>
@@ -38,16 +37,12 @@
             <label>Hydration level (0-10)<input type="number" id="hydration" min="0" max="10" /></label>
             <label class="inline-checkbox"><input type="checkbox" id="skipped-meals" />Skipped meals today</label>
           </div>
-
           <label>Food intake notes<textarea id="food-notes" rows="3" placeholder="Meals, snacks, ingredients..."></textarea></label>
           <fieldset><legend>Symptoms</legend><div id="symptom-tags" class="tag-grid"></div></fieldset>
           <fieldset>
             <legend>Possible triggers</legend>
             <div id="trigger-tags" class="tag-grid"></div>
-            <div class="custom-trigger-row">
-              <input id="custom-trigger-input" type="text" placeholder="Add custom trigger" />
-              <button type="button" id="add-custom-trigger">Add</button>
-            </div>
+            <div class="custom-trigger-row"><input id="custom-trigger-input" type="text" placeholder="Add custom trigger" /><button type="button" id="add-custom-trigger">Add</button></div>
           </fieldset>
           <label>Notes<textarea id="notes" rows="3" placeholder="Anything else to remember"></textarea></label>
           <div id="submit-status" class="status"></div>
@@ -56,6 +51,18 @@
       </section>
 
       <section class="card"><h2>Pattern Dashboard</h2><div id="dashboard"></div></section>
+      <section class="card">
+        <h2>Trends Over Time</h2>
+        <div class="grid filters">
+          <label>Range<select id="range-filter"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="all">All time</option></select></label>
+          <label>Trigger<select id="trigger-filter"><option value="all">All triggers</option></select></label>
+          <label>Symptom<select id="symptom-filter"><option value="all">All symptoms</option></select></label>
+        </div>
+        <div id="summary-cards" class="summary-grid"></div>
+        <div id="trends-grid" class="trends-grid"></div>
+        <h3>Calendar View</h3>
+        <div id="calendar-view" class="calendar-grid"></div>
+      </section>
       <section class="card"><h2>Recent Entries</h2><div id="entries"></div></section>
     </main>
     <script src="app.js"></script>
