@@ -1,3 +1,4 @@
+const ONBOARDING_KEY = 'mwt_onboarding_seen_v1';
 const STORAGE_KEYS = { entries: 'mwt_entries_v4', customTriggers: 'mwt_custom_triggers_v1', savedLocation: 'mwt_saved_location_v1' };
 const symptomOptions = ['nausea','aura','light sensitivity','sound sensitivity','neck pain','dizziness','fatigue','vision changes','brain fog'];
 const defaultTriggers = ['weather change','air pressure drop','poor sleep','stress','dehydration','caffeine','screen time','bright light','exercise','skipped meals','processed food'];
@@ -214,3 +215,24 @@ function populateTrendFilters(entries){
 const _refresh = refresh;
 refresh = function(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); populateTrendFilters(entries); renderTrends(entries); }
 if(rangeFilterEl){ [rangeFilterEl,triggerFilterEl,symptomFilterEl].forEach(el=>el?.addEventListener('change', ()=>refresh())); }
+
+
+function initExperienceUi(){
+  const tabs = Array.from(document.querySelectorAll('.tab'));
+  const panels = Array.from(document.querySelectorAll('.tab-panel'));
+  tabs.forEach((tab)=>tab.addEventListener('click', ()=>{
+    tabs.forEach(t=>t.classList.remove('active')); panels.forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    const panel = document.getElementById(`tab-${tab.dataset.tab}`);
+    if(panel) panel.classList.add('active');
+    window.scrollTo({top:0, behavior:'smooth'});
+  }));
+
+  const onboarding = document.getElementById('onboarding');
+  const startBtn = document.getElementById('start-app');
+  const seen = localStorage.getItem(ONBOARDING_KEY) === '1';
+  if(onboarding && !seen){ onboarding.classList.remove('hidden'); }
+  if(startBtn){ startBtn.addEventListener('click', ()=>{ localStorage.setItem(ONBOARDING_KEY, '1'); onboarding?.classList.add('hidden'); }); }
+}
+
+initExperienceUi();
