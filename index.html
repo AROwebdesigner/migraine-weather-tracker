@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Migraine & Wellness Tracker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <h1>Migraine Weather Tracker</h1>
+        <p>Track migraines, weather, pollen, food, symptoms, and triggers.</p>
+      </header>
+
+      <section class="card">
+        <h2>Log Entry</h2>
+        <form id="entry-form" class="entry-form">
+          <fieldset>
+            <legend>Location for weather & pollen</legend>
+            <div class="grid two-col">
+              <label>City / location<input type="text" id="location-city" required placeholder="e.g., Seattle" /></label>
+              <label>Country (optional)<input type="text" id="location-country" placeholder="e.g., US" /></label>
+            </div>
+            <p class="helper">Used only to fetch weather and pollen data for this entry.</p>
+            <button type="button" id="resolve-location">Update saved location</button>
+            <div id="location-result" class="status"></div>
+          </fieldset>
+
+          <div class="grid two-col">
+            <label>Date<input type="date" id="entry-date" required /></label>
+            <label>Migraine severity (0-10)<input type="number" id="severity" min="0" max="10" value="0" required /></label>
+            <label>Sleep (hours)<input type="number" id="sleep" min="0" step="0.1" /></label>
+            <label>Stress (0-10)<input type="number" id="stress" min="0" max="10" value="0" /></label>
+            <label>Meal time<input type="time" id="meal-time" /></label>
+            <label>Caffeine intake (mg)<input type="number" id="caffeine" min="0" step="1" /></label>
+            <label>Alcohol intake (drinks)<input type="number" id="alcohol" min="0" step="0.5" /></label>
+            <label>Hydration level (0-10)<input type="number" id="hydration" min="0" max="10" /></label>
+            <label class="inline-checkbox"><input type="checkbox" id="skipped-meals" />Skipped meals today</label>
+          </div>
+
+          <label>Food intake notes<textarea id="food-notes" rows="3" placeholder="Meals, snacks, ingredients..."></textarea></label>
+          <fieldset><legend>Symptoms</legend><div id="symptom-tags" class="tag-grid"></div></fieldset>
+          <fieldset>
+            <legend>Possible triggers</legend>
+            <div id="trigger-tags" class="tag-grid"></div>
+            <div class="custom-trigger-row">
+              <input id="custom-trigger-input" type="text" placeholder="Add custom trigger" />
+              <button type="button" id="add-custom-trigger">Add</button>
+            </div>
+          </fieldset>
+          <label>Notes<textarea id="notes" rows="3" placeholder="Anything else to remember"></textarea></label>
+          <div id="submit-status" class="status"></div>
+          <button type="submit">Save entry</button>
+        </form>
+      </section>
+
+      <section class="card"><h2>Pattern Dashboard</h2><div id="dashboard"></div></section>
+      <section class="card"><h2>Recent Entries</h2><div id="entries"></div></section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
