@@ -1,5 +1,5 @@
 const ONBOARDING_KEY = 'mwt_onboarding_seen_v1';
-const STORAGE_KEYS = { entries: 'mwt_entries_v4', customTriggers: 'mwt_custom_triggers_v1', savedLocation: 'mwt_saved_location_v1' };
+const STORAGE_KEYS = { entries: 'mwt_entries_v1', customTriggers: 'mwt_custom_triggers_v1', savedLocation: 'mwt_saved_location_v1' };
 const symptomOptions = ['nausea','aura','light sensitivity','sound sensitivity','neck pain','dizziness','fatigue','vision changes','brain fog'];
 const defaultTriggers = ['weather change','air pressure drop','poor sleep','stress','dehydration','caffeine','screen time','bright light','exercise','skipped meals','processed food'];
 const pollenKeys = ['alder_pollen','birch_pollen','grass_pollen','mugwort_pollen','olive_pollen','ragweed_pollen'];
@@ -13,10 +13,16 @@ const symptomTagsEl = document.getElementById('symptom-tags');
 const triggerTagsEl = document.getElementById('trigger-tags');
 let matchedLocation = null;
 
+const savedConfirmationEl = document.getElementById('saved-confirmation');
+const exportDataBtn = document.getElementById('export-data');
+const importDataInput = document.getElementById('import-data');
+const clearDataBtn = document.getElementById('clear-data');
+
+
 document.getElementById('entry-date').valueAsDate = new Date();
 
 const jget=(k,d='[]')=>JSON.parse(localStorage.getItem(k)||d); const jset=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
-const loadEntries=()=>jget(STORAGE_KEYS.entries); const saveEntries=(v)=>jset(STORAGE_KEYS.entries,v);
+const loadEntries=()=>{ const data=jget(STORAGE_KEYS.entries); console.log('Loaded entries from localStorage', data.length); return data; }; const saveEntries=(v)=>{ jset(STORAGE_KEYS.entries,v); console.log('Saved entries to localStorage', v.length); };
 const loadCustomTriggers=()=>jget(STORAGE_KEYS.customTriggers); const saveCustomTriggers=(v)=>jset(STORAGE_KEYS.customTriggers,v);
 const loadSavedLocation=()=>jget(STORAGE_KEYS.savedLocation,'null'); const saveSavedLocation=(v)=>jset(STORAGE_KEYS.savedLocation,v);
 
@@ -147,7 +153,7 @@ async function refreshEntryWeather(index){
 
 form.addEventListener('submit', async (event)=>{ event.preventDefault(); submitStatusEl.textContent='Saving entry...'; const city = document.getElementById('location-city').value.trim(); if(!city){ submitStatusEl.textContent='Location is required before weather fetch.'; return; } let location = matchedLocation; if(!location) location = await resolveLocation(); if(!location){ submitStatusEl.textContent='Please fix location before saving.'; return; }
   const entry = { date: document.getElementById('entry-date').value, severity:Number(document.getElementById('severity').value), sleep:document.getElementById('sleep').value, stress:document.getElementById('stress').value, mealTime:document.getElementById('meal-time').value, caffeine:document.getElementById('caffeine').value, alcohol:document.getElementById('alcohol').value, hydration:document.getElementById('hydration').value, skippedMeals:document.getElementById('skipped-meals').checked, foodNotes:document.getElementById('food-notes').value.trim(), symptoms:selectedTags('symptom'), triggers:selectedTags('trigger'), notes:document.getElementById('notes').value.trim(), location, weather: {}, weatherFetchStatus: 'pending', airQuality: { unavailable: true }, pollenFetchStatus: 'pending' };
-  const entries=loadEntries(); entries.push(entry); const newIndex = entries.length - 1; saveEntries(entries); submitStatusEl.textContent='Entry saved. Fetching weather and pollen in background...';
+  const entries=loadEntries(); entries.push(entry); const newIndex = entries.length - 1; saveEntries(entries); submitStatusEl.textContent='Entry saved. Fetching weather and pollen in background...'; if(savedConfirmationEl) savedConfirmationEl.textContent='✅ Saved locally';
   form.reset(); document.getElementById('entry-date').valueAsDate = new Date(); document.querySelectorAll('.tag.active').forEach(el=>el.classList.remove('active')); refresh();
   refreshEntryWeather(newIndex);
 });
