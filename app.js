@@ -125,23 +125,33 @@ async function fetchEnv(date, lat, lon){
     weather={ temperature:avg(hourly.temperature_2m), humidity:avg(hourly.relative_humidity_2m), precipitation:(hourly.precipitation||[]).reduce((a,b)=>a+(b||0),0), pressure:avg(hourly.pressure_msl)||avg(hourly.surface_pressure), weatherCode:hourly.weather_code?.[0]??null,
       pressureChange: ((avg(hourly.pressure_msl)||0)-(avg(prevHourly.pressure_msl)||0)).toFixed ? Number(((avg(hourly.pressure_msl)||0)-(avg(prevHourly.pressure_msl)||0)).toFixed(1)) : null,
       humidityCategory:humidityCategory(avg(hourly.relative_humidity_2m)), rain:(hourly.precipitation||[]).some(v=>v>0) };
-  } catch(e){ weatherFetchStatus='failed'; console.error('Weather fetch failed', e); }
+  } catch(e){ weatherFetchStatus='failed'; console.error('Weather fetch failed', { error:e, date, lat, lon, url: `${weatherBase(date)}?latitude=${lat}&longitude=${lon}` }); }
   let airQuality={ unavailable:true }, pollenFetchStatus='unavailable';
   try { const a=(await fetchAir(date,lat,lon)).hourly||{}; airQuality={pm2_5:avg(a.pm2_5),pm10:avg(a.pm10),dust:avg(a.dust)}; pollenKeys.forEach(k=>airQuality[k]=avg(a[k])); pollenFetchStatus=Object.values(airQuality).some(v=>v!=null)?'success':'unavailable'; }
-  catch(e){ pollenFetchStatus='failed'; console.error('Pollen fetch failed', e); }
+  catch(e){ pollenFetchStatus='failed'; console.error('Pollen fetch failed', { error:e, date, lat, lon, url:`https://air-quality-api.open-meteo.com/v1/air-quality` }); }
   return { weather, weatherFetchStatus, airQuality, pollenFetchStatus, hourlySnapshot: hourly };
 }
 
 async function refreshEntryWeather(index){
   const entries=loadEntries(); const e=entries[index]; if(!e?.location) return;
   entries[index]={...e,localStatus:'Saved locally',weatherFetchStatus:'pending',pollenFetchStatus:'pending'}; saveEntries(entries); refresh();
-  try{ const env=await fetchEnv(e.date,e.location.latitude,e.location.longitude); const latest=loadEntries(); latest[index]={...latest[index],...env,localStatus:'Weather added'}; saveEntries(latest); }
+  try{ const env=await fetchEnv(e.date,e.location.latitude,e.location.longitude); const latest=loadEntries(); latest[index]={...latest[index],...env,localStatus: (env.weatherFetchStatus==='success' ? 'Weather added' : 'Saved locally')}; saveEntries(latest); }
   catch{ const latest=loadEntries(); latest[index]={...latest[index],localStatus:'Weather failed',weatherFetchStatus:'failed',pollenFetchStatus:'failed'}; saveEntries(latest); }
   refresh();
 }
 
+
+function statusSummary(entry){
+  const w = entry.weatherFetchStatus || 'pending';
+  const p = entry.pollenFetchStatus || 'pending';
+  if(w==='failed') return 'Weather failed — saved locally. Retry available.';
+  if(w==='success' && (p==='failed' || p==='unavailable')) return 'Weather success · Pollen unavailable';
+  if(w==='success' && p==='success') return 'Weather success · Pollen success';
+  return 'Weather pending · saved locally';
+}
+
 function retryWeather(index){ return async ()=>{ try { submitStatusEl.textContent='Retrying weather...'; await refreshEntryWeather(index); submitStatusEl.textContent='Weather retry finished.'; } catch (e) { console.error('Retry weather failed', e); submitStatusEl.textContent='Weather failed.'; } }; }
-function renderEntries(entries){ entriesEl.innerHTML=''; if(!entries.length){ entriesEl.innerHTML='<p class="empty">No entries yet.</p>'; return; } entries.slice().reverse().forEach((e,ri)=>{const idx=entries.length-1-ri; const card=document.createElement('article'); card.className='entry-item'; card.innerHTML=`<h3>${e.date} · Severity ${e.severity}/10</h3><p>気圧低下: ${fmt(e.weather?.pressureChange,' hPa')} · 湿度: ${fmt(e.weather?.humidity,'%')} · 雨: ${e.weather?.rain?'Yes':'No'} · 花粉: ${fmt(e.airQuality?.birch_pollen)}</p><p><strong>Status:</strong> ${e.localStatus||'Saved locally'} · Weather ${e.weatherFetchStatus||'pending'} · Pollen ${e.pollenFetchStatus||'pending'}</p>`; const b=document.createElement('button'); b.textContent='Retry weather data'; b.onclick=retryWeather(idx); card.appendChild(b); entriesEl.appendChild(card); }); }
+function renderEntries(entries){ entriesEl.innerHTML=''; if(!entries.length){ entriesEl.innerHTML='<p class="empty">No entries yet.</p>'; return; } entries.slice().reverse().forEach((e,ri)=>{const idx=entries.length-1-ri; const card=document.createElement('article'); card.className='entry-item'; card.innerHTML=`<h3>${e.date} · Severity ${e.severity}/10</h3><p><strong>Pressure:</strong> ${fmt(e.weather?.pressure,' hPa')} · <strong>Pressure change:</strong> ${fmt(e.weather?.pressureChange,' hPa')}</p><p><strong>Humidity:</strong> ${fmt(e.weather?.humidity,'%')} · <strong>Rain:</strong> ${e.weather?.rain?'Yes':'No'} · <strong>PM2.5:</strong> ${fmt(e.airQuality?.pm2_5)} · <strong>Pollen:</strong> ${fmt(e.airQuality?.birch_pollen)}</p><p><strong>Weather:</strong> ${e.weatherFetchStatus||'pending'} · <strong>Pollen:</strong> ${e.pollenFetchStatus||'pending'}</p><p><strong>Status:</strong> ${statusSummary(e)}</p>`; const b=document.createElement('button'); b.textContent='Retry weather'; b.onclick=retryWeather(idx); card.appendChild(b); entriesEl.appendChild(card); }); }
 
 function renderPressureForecast(entries){
   if(!pressureForecastEl) return;
