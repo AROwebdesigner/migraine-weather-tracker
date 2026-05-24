@@ -97,14 +97,14 @@ async function fetchEnv(date, lat, lon){
 
 async function refreshEntryWeather(index){
   const entries=loadEntries(); const e=entries[index]; if(!e?.location) return;
-  entries[index]={...e,weatherFetchStatus:'pending',pollenFetchStatus:'pending'}; saveEntries(entries); refresh();
-  try{ const env=await fetchEnv(e.date,e.location.latitude,e.location.longitude); const latest=loadEntries(); latest[index]={...latest[index],...env}; saveEntries(latest); }
-  catch{ const latest=loadEntries(); latest[index]={...latest[index],weatherFetchStatus:'failed',pollenFetchStatus:'failed'}; saveEntries(latest); }
+  entries[index]={...e,localStatus:'Saved locally',weatherFetchStatus:'pending',pollenFetchStatus:'pending'}; saveEntries(entries); refresh();
+  try{ const env=await fetchEnv(e.date,e.location.latitude,e.location.longitude); const latest=loadEntries(); latest[index]={...latest[index],...env,localStatus:'Weather added'}; saveEntries(latest); }
+  catch{ const latest=loadEntries(); latest[index]={...latest[index],localStatus:'Weather failed',weatherFetchStatus:'failed',pollenFetchStatus:'failed'}; saveEntries(latest); }
   refresh();
 }
 
-function retryWeather(index){ return ()=>refreshEntryWeather(index); }
-function renderEntries(entries){ entriesEl.innerHTML=''; if(!entries.length){ entriesEl.innerHTML='<p class="empty">No entries yet.</p>'; return; } entries.slice().reverse().forEach((e,ri)=>{const idx=entries.length-1-ri; const card=document.createElement('article'); card.className='entry-item'; card.innerHTML=`<h3>${e.date} · Severity ${e.severity}/10</h3><p>気圧低下: ${fmt(e.weather?.pressureChange,' hPa')} · 湿度: ${fmt(e.weather?.humidity,'%')} · 雨: ${e.weather?.rain?'Yes':'No'} · 花粉: ${fmt(e.airQuality?.birch_pollen)}</p><p><strong>Status:</strong> Weather ${e.weatherFetchStatus||'pending'} · Pollen ${e.pollenFetchStatus||'pending'}</p>`; const b=document.createElement('button'); b.textContent='Retry weather data'; b.onclick=retryWeather(idx); card.appendChild(b); entriesEl.appendChild(card); }); }
+function retryWeather(index){ return async ()=>{ try { submitStatusEl.textContent='Retrying weather...'; await refreshEntryWeather(index); submitStatusEl.textContent='Weather retry finished.'; } catch (e) { console.error('Retry weather failed', e); submitStatusEl.textContent='Weather failed.'; } }; }
+function renderEntries(entries){ entriesEl.innerHTML=''; if(!entries.length){ entriesEl.innerHTML='<p class="empty">No entries yet.</p>'; return; } entries.slice().reverse().forEach((e,ri)=>{const idx=entries.length-1-ri; const card=document.createElement('article'); card.className='entry-item'; card.innerHTML=`<h3>${e.date} · Severity ${e.severity}/10</h3><p>気圧低下: ${fmt(e.weather?.pressureChange,' hPa')} · 湿度: ${fmt(e.weather?.humidity,'%')} · 雨: ${e.weather?.rain?'Yes':'No'} · 花粉: ${fmt(e.airQuality?.birch_pollen)}</p><p><strong>Status:</strong> ${e.localStatus||'Saved locally'} · Weather ${e.weatherFetchStatus||'pending'} · Pollen ${e.pollenFetchStatus||'pending'}</p>`; const b=document.createElement('button'); b.textContent='Retry weather data'; b.onclick=retryWeather(idx); card.appendChild(b); entriesEl.appendChild(card); }); }
 
 function renderPressureForecast(entries){
   if(!pressureForecastEl) return;
@@ -132,7 +132,7 @@ function renderDashboard(entries){ renderPressureForecast(entries); renderPressu
 function refresh(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); }
 
 form.addEventListener('submit', async (event)=>{ event.preventDefault(); const city=document.getElementById('location-city').value.trim(); if(!city){ submitStatusEl.textContent='Location required.'; return; } let location=matchedLocation; if(!location) location=await resolveLocation(); if(!location){ submitStatusEl.textContent='Location lookup failed.'; return; }
-  const entry={ date:document.getElementById('entry-date').value, severity:Number(document.getElementById('severity').value), sleep:document.getElementById('sleep').value, stress:document.getElementById('stress').value, mealTime:document.getElementById('meal-time').value, caffeine:document.getElementById('caffeine').value, alcohol:document.getElementById('alcohol').value, hydration:document.getElementById('hydration').value, skippedMeals:document.getElementById('skipped-meals').checked, foodNotes:document.getElementById('food-notes').value.trim(), symptoms:selectedTags('symptom'), triggers:selectedTags('trigger'), notes:document.getElementById('notes').value.trim(), location, weather:{}, weatherFetchStatus:'pending', airQuality:{unavailable:true}, pollenFetchStatus:'pending' };
+  const entry={ date:document.getElementById('entry-date').value, severity:Number(document.getElementById('severity').value), sleep:document.getElementById('sleep').value, stress:document.getElementById('stress').value, mealTime:document.getElementById('meal-time').value, caffeine:document.getElementById('caffeine').value, alcohol:document.getElementById('alcohol').value, hydration:document.getElementById('hydration').value, skippedMeals:document.getElementById('skipped-meals').checked, foodNotes:document.getElementById('food-notes').value.trim(), symptoms:selectedTags('symptom'), triggers:selectedTags('trigger'), notes:document.getElementById('notes').value.trim(), location, weather:{}, localStatus:'Saved locally', weatherFetchStatus:'pending', airQuality:{unavailable:true}, pollenFetchStatus:'pending' };
   const entries=loadEntries(); entries.push(entry); const idx=entries.length-1; saveEntries(entries); submitStatusEl.textContent='Saved locally. Weather pending.'; if(savedConfirmationEl) savedConfirmationEl.textContent='✅ Saved locally'; form.reset(); document.getElementById('entry-date').valueAsDate=new Date(); document.querySelectorAll('.tag.active').forEach(el=>el.classList.remove('active')); refresh(); refreshEntryWeather(idx);
 });
 
@@ -147,3 +147,9 @@ const saved=loadSavedLocation(); if(saved){ document.getElementById('location-ci
 createTagButtons(symptomTagsEl, symptomOptions, 'symptom');
 createTagButtons(triggerTagsEl, [...defaultTriggers,...loadCustomTriggers()], 'trigger');
 refresh();
+
+
+(function bindSafeButtonChecks(){
+  const required=['resolve-location','add-custom-trigger','export-data','import-data','clear-data'];
+  required.forEach((id)=>{ if(!document.getElementById(id)) console.error('Missing required button/input:', id); });
+})();
