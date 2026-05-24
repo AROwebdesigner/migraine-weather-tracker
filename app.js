@@ -160,7 +160,7 @@ async function resolveLocation(){
 
 function weatherBase(date){ return date < new Date().toISOString().slice(0,10) ? 'https://archive-api.open-meteo.com/v1/archive' : 'https://api.open-meteo.com/v1/forecast'; }
 async function fetchHourly(date, lat, lon){
-  const url = `${weatherBase(date)}?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&hourly=pressure_msl,surface_pressure,relative_humidity_2m,precipitation,temperature_2m,weather_code&timezone=auto`;
+  const url = `${weatherBase(date)}?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&hourly=pressure_msl,surface_pressure,relative_humidity_2m,precipitation,precipitation_probability,temperature_2m,weather_code,cloud_cover&timezone=auto`;
   const r=await fetchWithTimeout(url,5000); if(!r.ok) throw new Error(`Weather HTTP ${r.status}`); return r.json();
 }
 async function fetchAir(date, lat, lon){
@@ -172,49 +172,75 @@ function calculatePressureRisk(hourlyData, hadPrevDropMigraine=false){
   const p = hourlyData.pressure_msl || hourlyData.surface_pressure || [];
   const h = hourlyData.relative_humidity_2m || [];
   const pr = hourlyData.precipitation || [];
-  if(!p.length) return { level:'Unavailable', score:0, reason:'Pressure data unavailable.' };
+  const pp = hourlyData.precipitation_probability || [];
+  const cc = hourlyData.cloud_cover || [];
+  if(!p.length) return { level:'Unavailable', score:0, reason:'Pressure data unavailable.', labels:[] };
 
   const last6 = p.length>=7 ? p[p.length-1]-p[p.length-7] : 0;
   const next6 = p.length>=13 ? p[12]-p[0] : 0;
   const next24Series = p.slice(0,25);
 
-  let maxDrop = 0;
-  let maxRise = 0;
-  let absChanges = [];
+  let maxDrop = 0; let maxRise = 0; const absChanges=[]; const deltas=[];
   for(let i=1;i<next24Series.length;i++){
-    const d = next24Series[i]-next24Series[i-1];
-    if(d < maxDrop) maxDrop = d;
-    if(d > maxRise) maxRise = d;
-    absChanges.push(Math.abs(d));
+    const d = next24Series[i]-next24Series[i-1]; deltas.push(d);
+    if(d < maxDrop) maxDrop = d; if(d > maxRise) maxRise = d; absChanges.push(Math.abs(d));
   }
-
   const volatility = absChanges.length ? Number(absChanges.reduce((a,b)=>a+b,0).toFixed(2)) : 0;
   const avgHourlyChange = absChanges.length ? Number((absChanges.reduce((a,b)=>a+b,0)/absChanges.length).toFixed(2)) : 0;
   const rapidFluctuation = absChanges.filter(v=>v>=1.8).length >= 3 || volatility >= 16;
+
+  // new atmospheric intelligence signals
+  const avgCloud = cc.length ? avg(cc) : 0;
+  const avgHumidity = h.length ? avg(h) : 0;
+  const avgPrecipProb = pp.length ? avg(pp) : 0;
+  const rainNow = (pr[0]||0) > 0;
+  const pressureAcceleration = deltas.length>=3 ? Math.abs((deltas[deltas.length-1]||0) - (deltas[deltas.length-3]||0)) : 0;
+  const stormFrontDetected = (maxDrop<=-4 && avgCloud>=70) || (avgPrecipProb>=60 && avgCloud>=75);
+  const unstableAtmosphere = rapidFluctuation || (volatility>=14 && avgCloud>=65) || pressureAcceleration>=2.2;
+  const weatherTransition = (maxDrop<=-3 && maxRise>=2.5) || pressureAcceleration>=1.5;
 
   let score=0;
   if(next6<=-3 || last6<=-3 || maxDrop<=-3) score+=1;
   if(next6<=-5 || last6<=-5 || maxDrop<=-5) score+=2;
   if(maxDrop<=-8) score+=2;
   if(maxDrop<=-10) score+=3;
-  if(rapidFluctuation) score+=2;
-  if((pr[0]||0)>0) score+=1;
-  if((h[0]||0)>75) score+=1;
+  if(rapidFluctuation) score+=1.5;
+  if(stormFrontDetected) score+=1.5;
+  if(unstableAtmosphere) score+=1.5;
+  if(weatherTransition) score+=1;
+  if(rainNow) score+=0.7;
+  if((avgPrecipProb||0)>=70) score+=0.7;
+  if((avgHumidity||0)>80) score+=0.8;
+  if((avgCloud||0)>85) score+=0.8;
+  if(pressureAcceleration>=2.5) score+=1;
   if(hadPrevDropMigraine) score+=1;
 
-  const level = score>=7?'Very High':score>=5?'High':score>=3?'Moderate':'Low';
+  // dampening so model is nuanced and not always high
+  if(score>0 && maxDrop>-2.5 && !unstableAtmosphere && (avgCloud||0)<60 && !rainNow) score -= 1;
+  if(score<0) score = 0;
+
+  const level = score>=8?'Very High':score>=5.5?'High':score>=3.2?'Moderate':'Low';
 
   let state='Stable';
-  if(maxDrop<=-6) state='Significant pressure drop';
-  else if(rapidFluctuation) state='Rapid fluctuation';
+  if(stormFrontDetected) state='Storm front detected';
+  else if(unstableAtmosphere) state='Unstable atmospheric conditions';
+  else if(weatherTransition) state='Rapid pressure transition';
+  else if((avgCloud||0)>=80) state='Heavy cloud cover';
   else if(volatility>=8 || avgHourlyChange>=1.0) state='Mild fluctuation';
 
-  const reason = state==='Stable'
-    ? 'Pressure appears stable. Migraine risk may be lower right now.'
-    : `${state} may increase migraine risk.`;
+  const labels=[];
+  if(stormFrontDetected) labels.push('storm front detected');
+  if(unstableAtmosphere) labels.push('unstable atmospheric conditions');
+  if(weatherTransition) labels.push('rapid pressure transition');
+  if((avgCloud||0)>=80) labels.push('heavy cloud cover');
 
-  return { level, score, reason, state, last6, next6, current:p[0], humidity:h[0], rain:(pr[0]||0)>0, maxDrop, maxRise, volatility, avgHourlyChange, rapidFluctuation };
+  const reason = state==='Stable'
+    ? 'Atmosphere appears relatively stable; migraine risk may be lower right now.'
+    : `${state} may increase risk.`;
+
+  return { level, score:Number(score.toFixed(1)), reason, state, labels, last6, next6, current:p[0], humidity:h[0], rain:rainNow, maxDrop, maxRise, volatility, avgHourlyChange, rapidFluctuation, cloudCover:avgCloud, precipProbability:avgPrecipProb, pressureAcceleration };
 }
+
 
 // Weather and pollen enrichment (non-blocking after save).
 async function fetchEnv(date, lat, lon){
@@ -324,8 +350,9 @@ function renderMigraineForecast(r){
   if((r.humidity||0)>75) reasons.push('High humidity may increase sensitivity');
   if(r.rain) reasons.push('Rainfront is a possible trigger');
   if(!reasons.length) reasons.push('Pressure conditions look relatively stable');
-  const confidence = r.score>=6?'High':r.score>=3?'Medium':'Low';
-  migraineForecastEl.innerHTML=`<div class="metric"><strong>Today risk:</strong> ${r.level}</div><div class="metric"><strong>Tomorrow risk:</strong> ${r.score>=5?'High':r.score>=3?'Moderate':'Low'}</div><div class="metric"><strong>Risk score:</strong> ${r.score}</div><div class="metric"><strong>Confidence:</strong> ${confidence}</div><div class="metric"><strong>Main reasons:</strong> ${reasons.join(' · ')}</div><div class="metric">May increase risk; possible trigger; not medical advice.</div>`;
+  const confidence = r.score>=7?'High':r.score>=3.5?'Medium':'Low';
+  const atmLabels = (r.labels||[]).join(' · ');
+  migraineForecastEl.innerHTML=`<div class="metric"><strong>Today risk:</strong> ${r.level}</div><div class="metric"><strong>Tomorrow risk:</strong> ${r.score>=5.5?'High':r.score>=3.2?'Moderate':'Low'}</div><div class="metric"><strong>Risk score:</strong> ${r.score}</div><div class="metric"><strong>Confidence:</strong> ${confidence}</div><div class="metric"><strong>Main reasons:</strong> ${reasons.join(' · ')}</div><div class="metric"><strong>Atmospheric signals:</strong> ${atmLabels || 'no major front signals detected'}</div><div class="metric">May increase risk; possible trigger; not medical advice.</div>`;
 }
 function renderPressureInsights(entries){ if(!pressureInsightsEl) return; const m=entries.filter(e=>e.severity>=6); if(!m.length){ pressureInsightsEl.innerHTML='<p class="empty">No migraine history yet.</p>'; return; } const rainDays=m.filter(e=>e.weather?.rain).length; const humid=m.filter(e=>(e.weather?.humidity||0)>75).length; pressureInsightsEl.innerHTML=`<div class="metric">Pressure on migraine days: ${fmt(avg(m.map(e=>e.weather?.pressure).filter(Boolean)),' hPa')}</div><div class="metric">6h/24h drop indicator: ${m.filter(e=>(e.weather?.pressureChange||0)<=-3).length}/${m.length}</div><div class="metric">Rain on migraine days: ${rainDays}/${m.length}</div><div class="metric">High humidity days: ${humid}/${m.length}</div>`; }
 
