@@ -18,10 +18,11 @@
       </div>
     </div>
 
+    <div class="ambient-layer"></div>
     <header class="hero">
       <div class="hero-inner">
         <h1>Migraine Pattern Tracker</h1>
-        <p class="hero-sub">A personal migraine intelligence dashboard for lifestyle + environmental analytics.</p>
+        <p class="hero-sub">A calm, living wellness companion for migraine and environmental awareness.</p><div class="hero-orb"></div>
       </div>
     </header>
 
@@ -34,7 +35,7 @@
 
     <main class="container">
       <section id="tab-log" class="tab-panel active card">
-        <h2>Log Entry</h2>
+        <div class="section-hero"><h2>Log Entry</h2><p>Capture how you feel in a calm, supportive space.</p></div>
         <form id="entry-form" class="entry-form">
           <fieldset><legend>Location for weather & pollen</legend><div class="grid two-col"><label>City / location<input type="text" id="location-city" required placeholder="e.g., Seattle" /></label><label>Country (optional)<input type="text" id="location-country" placeholder="e.g., US" /></label></div><p class="helper">Used only to fetch weather and pollen data for this entry.</p><button type="button" id="resolve-location">Update saved location</button><div id="location-result" class="status"></div></fieldset>
           <div class="grid two-col"><label>Date<input type="date" id="entry-date" required /></label><label>Migraine severity (0-10)<input type="number" id="severity" min="0" max="10" value="0" required /></label><label>Sleep (hours)<input type="number" id="sleep" min="0" step="0.1" /></label><label>Stress (0-10)<input type="number" id="stress" min="0" max="10" value="0" /></label><label>Meal time<input type="time" id="meal-time" /></label><label>Caffeine intake (mg)<input type="number" id="caffeine" min="0" step="1" /></label><label>Alcohol intake (drinks)<input type="number" id="alcohol" min="0" step="0.5" /></label><label>Hydration level (0-10)<input type="number" id="hydration" min="0" max="10" /></label><label class="inline-checkbox"><input type="checkbox" id="skipped-meals" />Skipped meals today</label></div>
@@ -48,18 +49,18 @@
       </section>
 
       <section id="tab-dashboard" class="tab-panel card">
-        <h2>Pressure-First Dashboard</h2><div class="status">Saved locally / Weather pending / Weather failed / Weather added</div><h3>Pressure Forecast</h3><div id="pressure-forecast" class="empty">Loading forecast...</div>
+        <div class="section-hero"><h2>Pressure-First Dashboard</h2><p>Gentle atmospheric intelligence for today and tomorrow.</p></div><div class="status">Saved locally / Weather pending / Weather failed / Weather added</div><h3>Pressure Forecast</h3><div id="pressure-forecast" class="empty">Loading forecast...</div>
         <h3>Pressure Timeline (気圧低下)</h3><div id="pressure-timeline" class="empty">No timeline data.</div>
         <h3>Migraine Forecast (頭痛リスク)</h3><div id="migraine-forecast" class="empty">No forecast yet.</div>
         <h3>Pressure Pattern Insights</h3><div id="pressure-insights" class="empty">No insights yet.</div><h3>Trend Charts</h3><div id="trend-charts" class="trends-grid"><div class="chart-card clickable-chart" data-chart="severity"><h4>Migraine severity over time</h4><canvas id="chart-severity"></canvas></div><div class="chart-card clickable-chart" data-chart="pressure"><h4>Pressure vs migraine severity</h4><canvas id="chart-pressure"></canvas></div><div class="chart-card clickable-chart" data-chart="sleep"><h4>Sleep vs severity</h4><canvas id="chart-sleep"></canvas></div><div class="chart-card clickable-chart" data-chart="triggers"><h4>Trigger frequency</h4><canvas id="chart-triggers"></canvas><p class="helper">Shows how often each trigger appears in saved entries.</p></div><div class="chart-card clickable-chart" data-chart="symptoms"><h4>Symptom frequency</h4><canvas id="chart-symptoms"></canvas><p class="helper">Shows how often each symptom appears in saved entries.</p></div></div>
       </section>
 
       <section id="tab-entries" class="tab-panel card">
-        <h2>Recent Entries</h2><div class="data-tools"><button type="button" id="export-data">Export JSON</button><label class="import-btn">Import JSON<input id="import-data" type="file" accept="application/json" /></label><button type="button" id="clear-data">Clear all data</button></div><div id="saved-confirmation" class="status"></div><div id="entries" class="empty">No entries yet.</div>
+        <div class="section-hero"><h2>Recent Entries</h2><p>Your personal timeline of signals, patterns, and recovery.</p></div><div class="data-tools"><button type="button" id="export-data">Export JSON</button><label class="import-btn">Import JSON<input id="import-data" type="file" accept="application/json" /></label><button type="button" id="clear-data">Clear all data</button></div><div id="saved-confirmation" class="status"></div><div id="entries" class="empty">No entries yet — begin with a gentle first check-in.</div>
       </section>
     
       <section id="tab-calendar" class="tab-panel card">
-        <h2>Calendar</h2>
+        <div class="section-hero"><h2>Calendar</h2><p>See your rhythm over time with a seasonal migraine map.</p></div>
         <div class="calendar-toolbar">
           <button type="button" id="prev-month">Previous</button>
           <div class="calendar-head"><strong id="calendar-month-label">Month YYYY</strong><div class="calendar-toggle"><button type="button" id="calendar-view-month" class="active">Month View</button><button type="button" id="calendar-view-year">Year View</button></div></div>

@@ -103,3 +103,54 @@ legend { color:#6e5b48; font-weight: 600; padding: 0 .35rem; }
 }
 
 .calendar-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem}.calendar-toggle{display:flex;gap:.35rem}.calendar-toggle button{padding:.4rem .65rem}.calendar-toggle .active{background:var(--primary-soft);color:#4c5c41}.hidden{display:none !important}.calendar-year-view{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem;max-height:70vh;overflow:auto;animation:fadeIn .2s ease}.mini-month{padding:.5rem;border:1px solid var(--border);border-radius:10px;background:var(--surface-soft)}.calendar-heatmap{transition:opacity .2s ease}.heat-cell{transition:transform .12s ease, box-shadow .12s ease, opacity .2s ease}@keyframes fadeIn{from{opacity:.4}to{opacity:1}}
+
+
+/* Premium emotional wellness atmosphere */
+body{overflow-x:hidden}
+.ambient-layer{position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:
+    radial-gradient(40rem 30rem at 10% 10%, rgba(132,166,139,.14), transparent 60%),
+    radial-gradient(34rem 26rem at 90% 20%, rgba(211,164,121,.12), transparent 60%),
+    radial-gradient(36rem 26rem at 50% 100%, rgba(108,142,170,.12), transparent 60%);
+  animation: drift 24s ease-in-out infinite alternate;
+}
+@keyframes drift{0%{transform:translate3d(0,0,0) scale(1)}100%{transform:translate3d(0,-10px,0) scale(1.03)}}
+.hero{position:relative}
+.hero-orb{position:absolute;right:2%;top:0;width:120px;height:120px;border-radius:999px;
+ background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.65), rgba(126,153,124,.1));
+ filter:blur(.3px);box-shadow:0 0 60px rgba(161,136,110,.25);animation:pulse 6s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+
+.card{
+  background: color-mix(in srgb, var(--surface) 85%, white 15%);
+  border-color: color-mix(in srgb, var(--border) 70%, white 30%);
+  box-shadow: 0 16px 38px rgba(67,49,31,.11), inset 0 1px 0 rgba(255,255,255,.6);
+  backdrop-filter: blur(8px);
+}
+.section-hero{margin:-.2rem 0 .8rem;padding:.65rem .75rem;border-radius:12px;
+ background:linear-gradient(120deg, rgba(255,255,255,.45), rgba(240,231,216,.55));
+ border:1px solid rgba(223,209,190,.7)}
+.section-hero p{margin:0;color:var(--muted);font-size:.92rem}
+
+.tab{transition:transform .16s ease, background-color .2s ease,color .2s ease}
+.tab:hover{transform:translateY(-1px)}
+button{box-shadow:0 8px 20px rgba(73,92,65,.2)}
+button:active{transform:translateY(0) scale(.98)}
+
+.chart-card{position:relative;overflow:hidden}
+.chart-card::after{content:'';position:absolute;inset:auto -20% -40% -20%;height:70%;
+ background:radial-gradient(ellipse at center, rgba(123,156,123,.12), transparent 65%);pointer-events:none}
+
+.heat-cell{box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.heat-cell:hover{transform:translateY(-2px) scale(1.02)}
+
+.empty{padding:.55rem .65rem;border-radius:10px;background:rgba(255,255,255,.45);border:1px dashed var(--border)}
+.onboarding-card{background:linear-gradient(180deg,#fbf5ec,#f3e9dc)}
+
+/* subtle risk mood states via body data attr if applied by JS */
+body[data-risk='high'] .hero::before,
+body[data-risk='very-high'] .hero::before{content:'';position:absolute;inset:-30px 0 auto 0;height:120px;pointer-events:none;
+ background:radial-gradient(60% 100% at 50% 0, rgba(212,110,84,.24), transparent 70%)}
+body[data-weather='rain'] .ambient-layer{filter:saturate(.9) brightness(.95)}
+
+@media (max-width:700px){.hero-orb{width:90px;height:90px;right:4%}}

@@ -332,7 +332,7 @@ function renderPressureInsights(entries){ if(!pressureInsightsEl) return; const 
 function deleteEntry(index){ if(!confirm('Delete this entry?')) return; const entries=loadEntries(); entries.splice(index,1); saveEntries(entries); refresh(); }
 
 function renderDashboard(entries){ renderPressureForecast(entries); renderPressureInsights(entries); }
-function refresh(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); renderTrendCharts(entries); try { renderCalendar(entries); } catch (err) { console.error('Calendar module failed during refresh (non-blocking)', err); } }
+function refresh(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); renderTrendCharts(entries); try { renderCalendar(entries); } catch (err) { console.error('Calendar module failed during refresh (non-blocking)', err); } applyMoodState(entries); }
 
 form.addEventListener('submit', async (event)=>{ event.preventDefault(); const city=document.getElementById('location-city').value.trim(); if(!city){ submitStatusEl.textContent='Location required.'; return; } let location=matchedLocation; if(!location) location=await resolveLocation(); if(!location){ submitStatusEl.textContent='Location lookup failed.'; return; }
   const entry={ date:document.getElementById('entry-date').value, severity:Number(document.getElementById('severity').value), sleep:document.getElementById('sleep').value, stress:document.getElementById('stress').value, mealTime:document.getElementById('meal-time').value, caffeine:document.getElementById('caffeine').value, alcohol:document.getElementById('alcohol').value, hydration:document.getElementById('hydration').value, skippedMeals:document.getElementById('skipped-meals').checked, foodNotes:document.getElementById('food-notes').value.trim(), symptoms:selectedTags('symptom'), triggers:selectedTags('trigger'), notes:document.getElementById('notes').value.trim(), location, weather:{}, localStatus:'Saved locally', weatherFetchStatus:'pending', airQuality:{unavailable:true}, pollenFetchStatus:'pending' };
@@ -374,3 +374,13 @@ function bindTabs(){
 }
 
 function bindChartModal(){ document.querySelectorAll('.clickable-chart').forEach(el=>el.addEventListener('click', ()=>openChartModal(el.dataset.chart))); if(closeChartModalBtn) closeChartModalBtn.addEventListener('click', ()=>{ chartModalEl.classList.add('hidden'); if(modalChart){modalChart.destroy(); modalChart=null;} }); }
+
+
+function applyMoodState(entries){
+  try {
+    const last = entries?.[entries.length-1];
+    const risk = last?.weather?.pressureChange<=-6 ? 'high' : last?.weather?.pressureChange<=-3 ? 'moderate' : 'low';
+    document.body.dataset.risk = risk;
+    document.body.dataset.weather = last?.weather?.rain ? 'rain' : 'clear';
+  } catch(e){ console.error('Mood state apply failed', e); }
+}
