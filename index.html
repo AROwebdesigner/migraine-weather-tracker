@@ -2,65 +2,201 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Migraine Pattern Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="description" content="Premium Migraine Weather Tracker - Professional health analytics and environmental pattern discovery." />
+    <title>Migraine Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div id="onboarding" class="onboarding hidden">
-      <div class="onboarding-card">
-        <h2>Welcome to Migraine Pattern Tracker</h2>
-        <p>Track symptoms, lifestyle, and environmental patterns in one private, static app.</p>
-        <ul>
-          <li>No account required</li><li>Data saved locally on your device</li><li>Weather and pollen insights powered by Open-Meteo</li>
-        </ul>
-        <button id="start-app">Get started</button>
+    <div id="onboarding" class="onboarding hidden" role="dialog" aria-modal="true">
+      <div class="onboarding-content">
+        <div class="onboarding-icon">🧠</div>
+        <h2>Understand Your Migraines</h2>
+        <p>Discover patterns between your health and the environment. All data stays private on your device.</p>
+        <div class="onboarding-features">
+          <div class="feature-item"><span>📊</span> Professional Analytics</div>
+          <div class="feature-item"><span>🌦️</span> Weather & Pressure Insights</div>
+          <div class="feature-item"><span>🔒</span> 100% Private Local Storage</div>
+        </div>
+        <button id="start-app" class="btn-primary full-width">Get Started</button>
       </div>
     </div>
 
-    <header class="hero">
-      <div class="hero-inner">
-        <h1>Migraine Pattern Tracker</h1>
-        <p class="hero-sub">A personal migraine intelligence dashboard for lifestyle + environmental analytics.</p>
+    <nav class="bottom-nav" id="tabs" role="tablist">
+      <button class="nav-item active" data-tab="log" role="tab" aria-selected="true" aria-controls="tab-log">
+        <span class="nav-icon">➕</span>
+        <span class="nav-label">Log</span>
+      </button>
+      <button class="nav-item" data-tab="dashboard" role="tab" aria-selected="false" aria-controls="tab-dashboard">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label">Trends</span>
+      </button>
+      <button class="nav-item" data-tab="entries" role="tab" aria-selected="false" aria-controls="tab-entries">
+        <span class="nav-icon">📅</span>
+        <span class="nav-label">History</span>
+      </button>
+    </nav>
+
+    <header class="app-header">
+      <div class="header-content">
+        <div class="user-greeting">
+          <span class="date-today" id="current-date-display">Today</span>
+          <h1 id="greeting-text">Migraine Tracker</h1>
+        </div>
+        <div class="header-actions">
+          <button id="theme-toggle" class="icon-btn" aria-label="Toggle dark mode">🌓</button>
+        </div>
       </div>
     </header>
 
-    <nav class="tabs" id="tabs">
-      <button class="tab active" data-tab="log">Log Entry</button>
-      <button class="tab" data-tab="dashboard">Analytics</button>
-      <button class="tab" data-tab="entries">History</button>
-    </nav>
+    <main class="app-container">
+      <section id="tab-log" class="tab-panel active" role="tabpanel">
+        <div class="section-header">
+          <h2>New Entry</h2>
+          <p>Record your symptoms and environmental factors.</p>
+        </div>
+        
+        <form id="entry-form" class="premium-form">
+          <div class="form-section card">
+            <h3>Location</h3>
+            <div class="input-group">
+              <label for="location-city">City</label>
+              <input type="text" id="location-city" required placeholder="e.g., Tokyo" />
+            </div>
+            <div class="input-group">
+              <label for="location-country">Country (Optional)</label>
+              <input type="text" id="location-country" placeholder="e.g., JP" />
+            </div>
+            <button type="button" id="resolve-location" class="btn-secondary small">Update Location</button>
+            <div id="location-result" class="status-msg"></div>
+          </div>
 
-    <main class="container">
-      <section id="tab-log" class="tab-panel active card">
-        <h2>Log Entry</h2>
-        <form id="entry-form" class="entry-form">
-          <fieldset><legend>Location for weather & pollen</legend><div class="grid two-col"><label>City / location<input type="text" id="location-city" required placeholder="e.g., Seattle" /></label><label>Country (optional)<input type="text" id="location-country" placeholder="e.g., US" /></label></div><p class="helper">Used only to fetch weather and pollen data for this entry.</p><button type="button" id="resolve-location">Update saved location</button><div id="location-result" class="status"></div></fieldset>
-          <div class="grid two-col"><label>Date<input type="date" id="entry-date" required /></label><label>Migraine severity (0-10)<input type="number" id="severity" min="0" max="10" value="0" required /></label><label>Sleep (hours)<input type="number" id="sleep" min="0" step="0.1" /></label><label>Stress (0-10)<input type="number" id="stress" min="0" max="10" value="0" /></label><label>Meal time<input type="time" id="meal-time" /></label><label>Caffeine intake (mg)<input type="number" id="caffeine" min="0" step="1" /></label><label>Alcohol intake (drinks)<input type="number" id="alcohol" min="0" step="0.5" /></label><label>Hydration level (0-10)<input type="number" id="hydration" min="0" max="10" /></label><label class="inline-checkbox"><input type="checkbox" id="skipped-meals" />Skipped meals today</label></div>
-          <label>Food intake notes<textarea id="food-notes" rows="3" placeholder="Meals, snacks, ingredients..."></textarea></label>
-          <fieldset><legend>Symptoms</legend><div id="symptom-tags" class="tag-grid"></div></fieldset>
-          <fieldset><legend>Possible triggers</legend><div id="trigger-tags" class="tag-grid"></div><div class="custom-trigger-row"><input id="custom-trigger-input" type="text" placeholder="Add custom trigger" /><button type="button" id="add-custom-trigger">Add</button></div></fieldset>
-          <label>Notes<textarea id="notes" rows="3" placeholder="Anything else to remember"></textarea></label>
-          <div id="submit-status" class="status"></div>
-          <button type="submit">Save entry</button>
+          <div class="form-section card">
+            <h3>Details</h3>
+            <div class="grid-2">
+              <div class="input-group">
+                <label for="entry-date">Date</label>
+                <input type="date" id="entry-date" required />
+              </div>
+              <div class="input-group">
+                <label for="severity">Severity (0-10)</label>
+                <div class="severity-slider-container">
+                  <input type="range" id="severity" min="0" max="10" value="0" step="1" />
+                  <span class="severity-value" id="severity-display">0</span>
+                </div>
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="input-group">
+                <label for="sleep">Sleep (Hours)</label>
+                <input type="number" id="sleep" min="0" step="0.5" placeholder="8.0" />
+              </div>
+              <div class="input-group">
+                <label for="stress">Stress (0-10)</label>
+                <input type="number" id="stress" min="0" max="10" value="0" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section card">
+            <h3>Symptoms</h3>
+            <div id="symptom-tags" class="chip-grid"></div>
+          </div>
+
+          <div class="form-section card">
+            <h3>Triggers</h3>
+            <div id="trigger-tags" class="chip-grid"></div>
+            <div class="custom-add-row">
+              <input id="custom-trigger-input" type="text" placeholder="Add custom trigger..." />
+              <button type="button" id="add-custom-trigger" class="btn-add">Add</button>
+            </div>
+          </div>
+
+          <div class="form-section card">
+            <h3>Notes</h3>
+            <textarea id="notes" rows="3" placeholder="Describe how you feel..."></textarea>
+          </div>
+
+          <div id="submit-status" class="status-msg center"></div>
+          <button type="submit" class="btn-primary full-width large">Save Entry</button>
+          <div class="spacer-bottom"></div>
         </form>
       </section>
 
-      <section id="tab-dashboard" class="tab-panel card">
-        <h2>Pressure-First Dashboard</h2><div class="status">Saved locally / Weather pending / Weather failed / Weather added</div><h3>Pressure Forecast</h3><div id="pressure-forecast" class="empty">Loading forecast...</div>
-        <h3>Pressure Timeline (気圧低下)</h3><div id="pressure-timeline" class="empty">No timeline data.</div>
-        <h3>Migraine Forecast (頭痛リスク)</h3><div id="migraine-forecast" class="empty">No forecast yet.</div>
-        <h3>Pressure Pattern Insights</h3><div id="pressure-insights" class="empty">No insights yet.</div>
+      <section id="tab-dashboard" class="tab-panel" role="tabpanel">
+        <div class="section-header">
+          <h2>Insights</h2>
+          <p>Environmental risk and pattern analysis.</p>
+        </div>
+
+        <div class="risk-card card" id="risk-level-container">
+          <div class="risk-header">
+            <span class="risk-label">Current Pressure Risk</span>
+            <div class="risk-badge" id="risk-badge">Low</div>
+          </div>
+          <div class="risk-description" id="risk-description">Loading weather data...</div>
+        </div>
+
+        <div class="insights-grid">
+          <div class="card insight-card">
+            <h4>Pressure Forecast</h4>
+            <div id="pressure-forecast" class="metric-list"></div>
+          </div>
+          
+          <div class="card insight-card">
+            <h4>Pressure Timeline</h4>
+            <div id="pressure-timeline" class="chart-container"></div>
+          </div>
+
+          <div class="card insight-card">
+            <h4>Health Forecast</h4>
+            <div id="migraine-forecast" class="metric-list"></div>
+          </div>
+
+          <div class="card insight-card">
+            <h4>Historical Correlations</h4>
+            <div id="pressure-insights" class="metric-list"></div>
+          </div>
+        </div>
+        <div class="spacer-bottom"></div>
       </section>
 
-      <section id="tab-entries" class="tab-panel card">
-        <h2>Recent Entries</h2><div class="data-tools"><button type="button" id="export-data">Export JSON</button><label class="import-btn">Import JSON<input id="import-data" type="file" accept="application/json" /></label><button type="button" id="clear-data">Clear all data</button></div><div id="saved-confirmation" class="status"></div><div id="entries" class="empty">No entries yet.</div>
+      <section id="tab-entries" class="tab-panel" role="tabpanel">
+        <div class="section-header">
+          <h2>History</h2>
+          <div class="header-actions">
+            <button id="export-data" class="icon-btn" title="Export">📤</button>
+            <label class="icon-btn" title="Import">
+              📥
+              <input id="import-data" type="file" accept="application/json" style="display:none" />
+            </label>
+            <button id="clear-data" class="icon-btn danger" title="Clear All">🗑️</button>
+          </div>
+        </div>
+
+        <div id="saved-confirmation" class="status-msg center"></div>
+        <div id="entries" class="history-list"></div>
+        <div class="spacer-bottom"></div>
       </section>
     </main>
+
+    <div id="chart-modal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content card">
+        <div class="modal-header">
+          <h3 id="modal-title">Chart Detail</h3>
+          <button class="close-modal">✕</button>
+        </div>
+        <div id="chart-modal-body" class="modal-body"></div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="fix.js"></script>
-    <script src="ui-fixes.js"></script>
-    <script src="charts-restore.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
