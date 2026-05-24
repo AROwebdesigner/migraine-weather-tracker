@@ -101,3 +101,5 @@ legend { color:#6e5b48; font-weight: 600; padding: 0 .35rem; }
   .calendar-heatmap .heat-cell{border-color:#5a4a3a;background:#3d352d}
   .calendar-heatmap .heat-cell.empty{background:#4a4137}
 }
+
+.calendar-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem}.calendar-toggle{display:flex;gap:.35rem}.calendar-toggle button{padding:.4rem .65rem}.calendar-toggle .active{background:var(--primary-soft);color:#4c5c41}.hidden{display:none !important}.calendar-year-view{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem;max-height:70vh;overflow:auto;animation:fadeIn .2s ease}.mini-month{padding:.5rem;border:1px solid var(--border);border-radius:10px;background:var(--surface-soft)}.calendar-heatmap{transition:opacity .2s ease}.heat-cell{transition:transform .12s ease, box-shadow .12s ease, opacity .2s ease}@keyframes fadeIn{from{opacity:.4}to{opacity:1}}

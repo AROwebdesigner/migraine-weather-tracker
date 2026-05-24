@@ -38,10 +38,14 @@ let modalChart = null;
 // Calendar heatmap (incremental feature; preserves existing architecture)
 const calendarHeatmapEl = document.getElementById('calendar-heatmap');
 const calendarMonthLabelEl = document.getElementById('calendar-month-label');
-const calendarPrevBtn = document.getElementById('calendar-prev');
-const calendarNextBtn = document.getElementById('calendar-next');
-let calendarCursor = new Date();
-calendarCursor.setDate(1);
+const calendarPrevBtn = document.getElementById('prev-month');
+const calendarNextBtn = document.getElementById('next-month');
+let currentCalendarDate = new Date();
+currentCalendarDate.setDate(1);
+let calendarViewMode = 'month';
+const calendarYearViewEl = document.getElementById('calendar-year-view');
+const calendarViewMonthBtn = document.getElementById('calendar-view-month');
+const calendarViewYearBtn = document.getElementById('calendar-view-year');
 
 function severityClass(sev){
   if(sev<=2) return 'sev-0';
@@ -59,21 +63,56 @@ function buildSeverityMap(entries){
 
 function renderCalendarHeatmap(entries){
   if(!calendarHeatmapEl || !calendarMonthLabelEl) return;
-  const y=calendarCursor.getFullYear(); const m=calendarCursor.getMonth();
-  calendarMonthLabelEl.textContent = calendarCursor.toLocaleDateString(undefined,{month:'long', year:'numeric'});
-  const first = new Date(y,m,1); const startOffset=(first.getDay()+6)%7; // monday-first
+  const y=currentCalendarDate.getFullYear(); const m=currentCalendarDate.getMonth();
+  calendarMonthLabelEl.textContent = currentCalendarDate.toLocaleDateString(undefined,{month:'long', year:'numeric'});
+  const first = new Date(y,m,1); const startOffset=(first.getDay()+6)%7;
   const daysInMonth = new Date(y,m+1,0).getDate();
   const severityMap = buildSeverityMap(entries);
+  const entryMap = Object.fromEntries(entries.filter(e=>e.date).map(e=>[e.date,e]));
   const cells=[];
   for(let i=0;i<startOffset;i++) cells.push('<div class="heat-cell empty"></div>');
   for(let d=1; d<=daysInMonth; d++){
     const date = new Date(y,m,d); const key=date.toISOString().slice(0,10);
     const sev = severityMap[key];
-    if(sev==null) cells.push(`<div class="heat-cell" title="${key}: no migraine logged"></div>`);
-    else cells.push(`<div class="heat-cell ${severityClass(sev)}" title="${key}: severity ${sev}"></div>`);
+    const e = entryMap[key];
+    const tip = e ? `${key}
+Severity: ${sev}
+Symptoms: ${(e.symptoms||[]).join(', ')||'-'}
+Triggers: ${(e.triggers||[]).join(', ')||'-'}
+Pressure: ${e.weather?.pressure ?? 'N/A'}` : `${key}: no migraine logged`;
+    if(sev==null) cells.push(`<div class="heat-cell" title="${tip}"></div>`);
+    else cells.push(`<div class="heat-cell ${severityClass(sev)}" title="${tip}"></div>`);
   }
   calendarHeatmapEl.innerHTML = cells.join('');
 }
+
+function renderAnnualHeatmap(entries){
+  if(!calendarYearViewEl) return;
+  const y=currentCalendarDate.getFullYear();
+  const severityMap = buildSeverityMap(entries);
+  const months=[];
+  for(let m=0;m<12;m++){
+    const first = new Date(y,m,1); const startOffset=(first.getDay()+6)%7; const daysInMonth = new Date(y,m+1,0).getDate();
+    const cells=[]; for(let i=0;i<startOffset;i++) cells.push('<div class="heat-cell empty"></div>');
+    for(let d=1; d<=daysInMonth; d++){
+      const key=new Date(y,m,d).toISOString().slice(0,10); const sev=severityMap[key];
+      cells.push(sev==null?'<div class="heat-cell"></div>':`<div class="heat-cell ${severityClass(sev)}" title="${key}: severity ${sev}"></div>`);
+    }
+    months.push(`<div class="mini-month"><strong>${new Date(y,m,1).toLocaleDateString(undefined,{month:'short'})}</strong><div class="calendar-heatmap">${cells.join('')}</div></div>`);
+  }
+  calendarYearViewEl.innerHTML = months.join('');
+}
+
+function renderCalendar(entries){
+  renderCalendar(entries);
+  renderAnnualHeatmap(entries);
+  const monthMode = calendarViewMode==='month';
+  calendarHeatmapEl.classList.toggle('hidden', !monthMode);
+  calendarYearViewEl?.classList.toggle('hidden', monthMode);
+  calendarViewMonthBtn?.classList.toggle('active', monthMode);
+  calendarViewYearBtn?.classList.toggle('active', !monthMode);
+}
+
 
 
 
@@ -289,7 +328,7 @@ function renderPressureInsights(entries){ if(!pressureInsightsEl) return; const 
 function deleteEntry(index){ if(!confirm('Delete this entry?')) return; const entries=loadEntries(); entries.splice(index,1); saveEntries(entries); refresh(); }
 
 function renderDashboard(entries){ renderPressureForecast(entries); renderPressureInsights(entries); }
-function refresh(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); renderTrendCharts(entries); renderCalendarHeatmap(entries); }
+function refresh(){ const entries=loadEntries(); renderEntries(entries); renderDashboard(entries); renderTrendCharts(entries); renderCalendar(entries); }
 
 form.addEventListener('submit', async (event)=>{ event.preventDefault(); const city=document.getElementById('location-city').value.trim(); if(!city){ submitStatusEl.textContent='Location required.'; return; } let location=matchedLocation; if(!location) location=await resolveLocation(); if(!location){ submitStatusEl.textContent='Location lookup failed.'; return; }
   const entry={ date:document.getElementById('entry-date').value, severity:Number(document.getElementById('severity').value), sleep:document.getElementById('sleep').value, stress:document.getElementById('stress').value, mealTime:document.getElementById('meal-time').value, caffeine:document.getElementById('caffeine').value, alcohol:document.getElementById('alcohol').value, hydration:document.getElementById('hydration').value, skippedMeals:document.getElementById('skipped-meals').checked, foodNotes:document.getElementById('food-notes').value.trim(), symptoms:selectedTags('symptom'), triggers:selectedTags('trigger'), notes:document.getElementById('notes').value.trim(), location, weather:{}, localStatus:'Saved locally', weatherFetchStatus:'pending', airQuality:{unavailable:true}, pollenFetchStatus:'pending' };
